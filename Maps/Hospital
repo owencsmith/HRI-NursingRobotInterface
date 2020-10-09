@@ -1,0 +1,43 @@
+{
+  "objects": [
+    {
+      "name":"Wall 1","type": "rect", "centerX": "-1200", "centerY": "-150", "length": "1915", "width": "16", "rotation": "90"
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": "-600", "centerY": "8", "length": "600", "width": "16", "rotation": "0"
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": "-308", "centerY": "300", "length": "600", "width": "16", "rotation": "90"
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": "-400", "centerY": "592", "length": "200", "width": "16", "rotation": "0"
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": "-608", "centerY": "750", "length": "100", "width": "16", "rotation": "90"
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": "-750", "centerY": "792", "length": "300", "width": "16", "rotation": "0"
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": "-892", "centerY": "400", "length": "300", "width": "16", "rotation": "0"
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": "-600", "centerY": "-308", "length": "600", "width": "16", "rotation": "0"
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": "-892", "centerY": "600", "length": "600", "width": "16", "rotation": "90"
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": "-800", "centerY": "-892", "length": "200", "width": "16", "rotation": "0"
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": "-592", "centerY": "1050", "length": "100", "width": "16", "rotation": "90"
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": "-450", "centerY": "1092", "length": "300", "width": "16", "rotation": "0"
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": "-308", "centerY": "700", "length": "300", "width": "16", "rotation": "0"
+    }
+  ]
+}
