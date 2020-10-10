@@ -1,0 +1,4 @@
+string name
+string currentTask
+string status
+geometry_msgs/PoseWithCovarianceStamped pose

@@ -1,16 +1,26 @@
 #!/usr/bin/env python
 import rospy
+from std_msgs.msg import *
+from Robot import *
+
+#TODO: Method to create a new robot and add to dictionary
+
 class Middleman():
     def __init__(self):
         rospy.init_node("middleman", anonymous = True)
         # dictionary for task codes
         self.taskCodes = {}
 
+        self.myRobot = Robot()
         # dictionary of all active robots
-        self.activeRobotDictionary = {}
+        self.activeRobotDictionary = {
+            '': self.myRobot
+        }
 
         #operator queue
         self.robotsForOperator = []
+
+        self.rate = rospy.Rate(1)
 
         #TODO:
         rospy.Subscriber("/supervisor/nav_task", String, self.processNavTask)
@@ -31,6 +41,7 @@ class Middleman():
 
 
     def processNavTask(self, data):
+        print("Processing Nav Goal")
         # parses Robot name XY string and sends to robots movebase
         robotName = ""
         X = ""
@@ -39,10 +50,10 @@ class Middleman():
         currentRobot.currentTask = "NAV"
         worldCoordinates = self.guiCoordinatesToWorldCoordinates([X,Y])
         #publish coordinates to move_base of specific robot
-        currentRobot.publish()
         pass
 
     def passRobotToQueueForOperator(self, data):
+        print("Passing robot")
         #get robot name
         robotName = data.data
         #uses name to get robot object
@@ -56,6 +67,7 @@ class Middleman():
         pass
 
     def advanceRobotHelpQueue(self,data):
+        print("Loading Next Robot")
         #parse robot name
         robotName = ""
         robotThatWasHelped = self.activeRobotDictionary[robotName]
@@ -67,6 +79,7 @@ class Middleman():
         pass
 
     def sendAnotherRobotForCameraViews(self):
+        print("Requesting another robot for camera views")
         # Is there an IDLE robot that CAN be used?
             # find it and grab it from the dictionary
             # publish that a robot is on its way
@@ -86,15 +99,14 @@ class Middleman():
     def worldCoordinatesToGuiCoordinates(self, coordinates):
         pass
 
-    def publishAllRobotStates(self):
-        pass
-
     def sendTaskToRobot(self):
+        print("Assigning task to robot")
         # if else chain depending on task or dictionary of task code
         # linking to function
         pass
 
     def alertSupervisorRobotIsDone(self):
+        print("Robot has finished task. Going to IDLE")
         #find robot in dicionary
         #change robot task to IDLE
         # publish to /supervisor/robots_finished_task that the robot is done
@@ -108,5 +120,8 @@ class Middleman():
     def publishRobotsLeftInQueue(self):
         self.robotsLeftInQueue.publish()
 
-
-
+middleman = Middleman()
+while not rospy.is_shutdown():
+    middleman.publishRobotStates()
+    middleman.publishRobotsLeftInQueue()
+    middleman.rate.sleep()
