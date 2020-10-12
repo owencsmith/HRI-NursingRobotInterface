@@ -9,7 +9,7 @@ class Robot():
         self.status = "OK" # Good (OK), Bad (NOK), Operator Control (OPC)
         self.pose = pose
         #subscribe to amcl to get pose estimate
-        rospy.Subscriiber('amcl_pose', geometry_msgs/PoseWithCovarianceStamped, self.updateRobotPose)
+        rospy.Subscriber('amcl_pose', geometry_msgs/PoseWithCovarianceStamped, self.updateRobotPose)
         #publishers
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', String, queue_size=10)
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', String, queue_size=10)
