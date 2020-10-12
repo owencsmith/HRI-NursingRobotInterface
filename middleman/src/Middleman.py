@@ -42,6 +42,7 @@ class Middleman():
         #publishers
         # TODO: Make our own Robot message with fields of robot object -- Done
         # TODO: when operator is done with a robot, pop from list and send new one using Service/Client (not publisher) -- N/A anymore
+
         self.sendNewRobotToOperator  = rospy.Publisher('/operator/new_robot', String, queue_size=10)
         self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool, queue_size = 10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size = 10)
