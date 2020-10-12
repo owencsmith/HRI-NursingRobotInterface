@@ -3,7 +3,7 @@
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont
+from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint
 from PyQt5.QtCore import Qt, QLineF, QRectF
 import sys
@@ -28,12 +28,12 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.yellow = QColor(qRgb(255, 255, 0))
         self.purple = QColor(qRgb(238, 130, 238))
         self.magenta = QColor(qRgb(255, 0, 255))
-        self.Graphicswidth = graphicsSize.width()
-        self.Graphicsheight = graphicsSize.height()
+        self.scaleFactor = 0.4
         self.scene = QGraphicsScene()
         #TODO self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.SupervisorMap.setMouseTracking(True)
         #todo self.scene.mouseMoveEvent = self.MouseMovementEvent
+        self.SupervisorMap.wheelEvent = self.wheelEvent
         self.SupervisorMap.setScene(self.scene)
         self.loadMap(map)
     def AsyncFunctionsThreadCallback(self, result):
@@ -69,7 +69,16 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 label.setFont(font)
                 label.setRotation(item["rotation"])
                 self.scene.addItem(label)
-
+        self.SupervisorMap.scale(self.scaleFactor, self.scaleFactor)
+    def wheelEvent(self, event):
+        oldScale = self.scaleFactor
+        if event.angleDelta().y()>0:
+            if(self.scaleFactor < 2.0):
+                self.scaleFactor += 0.05
+        elif event.angleDelta().y()<0:
+            if (self.scaleFactor > 0.1):
+                self.scaleFactor -= 0.05
+        self.SupervisorMap.scale(self.scaleFactor/oldScale, self.scaleFactor/oldScale)
 
 
 
