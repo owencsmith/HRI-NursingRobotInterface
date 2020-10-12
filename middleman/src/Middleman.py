@@ -9,6 +9,8 @@ from middleman.msg import Robot
 #TODO: Pickup ros odom messages to detect new robots
 # a robot sends a message that its booted, we pick that up
 # Launch a node with each robot that tells the middle man that a new robot exists
+# Use the name of the robot to determine all the topics for that specific robot since they are all the same
+# except the name
 
 #TODO: We're proabbly going to have to have a topic for each of the robot joints as well.... Robot is going
 # to encapsulate a lot of information
