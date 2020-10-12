@@ -131,8 +131,9 @@ class Middleman():
     # The message that triggers this callback function should give all the unique information about the robot
     # It should have the unique move base and amcl topics
     def createNewRobot(self, data):
+        print("Registering new robot. Robot name: " + str(data.data))
         newRobot = Robot()
-        newRobot.name = "ROB_" + str(len(self.activeRobotDictionary))
+        newRobot.name = data.data
         newRobot.status = "OK"
         newRobot.currentTask = "IDLE"
         # if the robot is not already in the dictionary
