@@ -20,6 +20,15 @@ class Middleman():
     def __init__(self):
         rospy.init_node("middleman", anonymous = True)
         # dictionary for task codes
+        """
+        Task codes:
+            NAV: Robot is navigating 
+            HLP: Robot Operator is asking for another robot for additional camera views
+            CLN: Robot is asked to clean
+            DLV: Robot is asked to deliver something 
+            IDLE: Robot has no current task
+            SOS: Supervisor passes control of the robot to the operator
+        """
         self.taskCodes = {
 
         }
@@ -45,7 +54,7 @@ class Middleman():
         # TODO: Make our own Robot message with fields of robot object -- Done
         # TODO: when operator is done with a robot, pop from list and send new one using Service/Client (not publisher) -- N/A anymore
 
-        self.sendNewRobotToOperator  = rospy.Publisher('/operator/new_robot', String, queue_size=10)
+        self.sendNewRobotToOperator  = rospy.Publisher('/operator/new_robot', Robot, queue_size=10)
         self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool, queue_size = 10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size = 10)
         self.robotsLeftInQueue = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
@@ -61,11 +70,14 @@ class Middleman():
         robotName = dataList[0]
         X = dataList[1]
         Y = dataList[2]
+        self.sendRobotToPos(robotName, float(X), float(Y))
+        pass
+
+    def sendRobotToPos(self, robotName, X, Y):
         currentRobot = self.activeRobotDictionary[robotName]
         currentRobot.currentTask = "NAV"
-        worldCoordinates = self.guiCoordinatesToWorldCoordinates([X,Y])
-        #publish coordinates to move_base of specific robot
-        pass
+        worldCoordinates = self.guiCoordinatesToWorldCoordinates([X, Y])
+        # publish coordinates to move_base of specific robot
 
     def passRobotToQueueForOperator(self, data):
         print("Passing robot")
@@ -90,22 +102,36 @@ class Middleman():
         robotThatWasHelped.status = "OK"
         robotThatWasHelped.currentTask = "IDLE"
         # pop another robot from the queue if queue is not empty
+        nextRobot = self.robotsForOperator.pop()
         # publish that robot to /operator/new_robot
+        self.sendNewRobotToOperator.publish(nextRobot)
         pass
 
-    def sendAnotherRobotForCameraViews(self):
+    def sendAnotherRobotForCameraViews(self, data):
         print("Requesting another robot for camera views")
+        robotAvailableForHelp = False
+        robotThatWillHelp = None
         # Is there an IDLE robot that CAN be used?
-            # find it and grab it from the dictionary
-            # publish that a robot is on its way
-        # If not
-            # publish that no robot could be used right now
-
-        # parse the string for the robot to navigate to for more views
-        # grab the pose of the robot to navigate to
-        # Tell the IDLE robot to navigate to the robot that needs more views
-        # set the task of the IDLE robot to NAV
-        # set the status of the IDLE robot to OPC
+        for robot in self.activeRobotDictionary.values():
+            if(robot.currentTask == "IDLE"):
+                # find it and grab it from the dictionary
+                robot.currentTask = "HLP"
+                # publish that a robot is on its way
+                robot.status = "OPC"
+                robotAvailableForHelp = True
+                robotThatWillHelp = robot
+                break
+        if(not robotAvailableForHelp):
+            return False
+        else:
+            # parse the string for the robot to navigate to for more views
+            robotToNavigateTo = self.activeRobotDictionary[data.data.split()[0]]
+            # grab the pose of the robot to navigate to
+            robotToNavigateToPose = robotToNavigateTo.pose
+            robotToNavigateToX = robotToNavigateToPose.pose.pose.position.x
+            robotToNavigateToY = robotToNavigateToPose.pose.pose.position.y
+            # Tell the IDLE robot to navigate to the robot that needs more views
+            self.sendRobotToPos(str(robotThatWillHelp.name), robotToNavigateToX, robotToNavigateToY)
         pass
 
     def guiCoordinatesToWorldCoordinates(self, coordinates):
