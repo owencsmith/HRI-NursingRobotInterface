@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import *
-from middleman.msg import Robot
+from middleman.msg import Robot, RobotArr
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 
 #TODO: Method to create a new robot and add to dictionary
 # if robot is not in dictionary then add it to the dictionary -- Done
@@ -54,12 +55,12 @@ class Middleman():
         # TODO: Make our own Robot message with fields of robot object -- Done
         # TODO: when operator is done with a robot, pop from list and send new one using Service/Client (not publisher) -- N/A anymore
 
-        self.sendNewRobotToOperator  = rospy.Publisher('/operator/new_robot', Robot, queue_size=10)
+        self.sendNewRobotToOperator = rospy.Publisher('/operator/new_robot', Robot, queue_size=10)
         self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool, queue_size = 10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size = 10)
         self.robotsLeftInQueue = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
-        self.statePublisherForOperator = rospy.Publisher('/operator/robotState', Robot, queue_size=10)
-        self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', Robot, queue_size=10)
+        self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
+        self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         pass
 
 
@@ -76,8 +77,16 @@ class Middleman():
     def sendRobotToPos(self, robotName, X, Y):
         currentRobot = self.activeRobotDictionary[robotName]
         currentRobot.currentTask = "NAV"
-        worldCoordinates = self.guiCoordinatesToWorldCoordinates([X, Y])
+        # worldCoordinates = self.guiCoordinatesToWorldCoordinates([X, Y])
         # publish coordinates to move_base of specific robot
+        poseStamped = PoseStamped()
+        poseStamped.pose.position.x = X
+        poseStamped.pose.position.y = Y
+        poseStamped.header.frame_id = 'odom'
+        # arbitrary orientation for nav goal because operator/automation will take over
+        poseStamped.pose.orientation.w = 1
+        poseStamped.pose.orientation.z = .16
+        rospy.Publisher(currentRobot.namespace+'/move_base_simple/goal', PoseStamped, queue_size=10).publish(poseStamped)
 
     def passRobotToQueueForOperator(self, data):
         print("Passing robot")
@@ -162,15 +171,34 @@ class Middleman():
         newRobot.name = data.data
         newRobot.status = "OK"
         newRobot.currentTask = "IDLE"
+        rospy.Subscriber(newRobot.name+'/amcl_pose', PoseWithCovarianceStamped, self.updateRobotPose)
         # if the robot is not already in the dictionary
         if(newRobot.name not in self.activeRobotDictionary.keys()):
             self.activeRobotDictionary[newRobot.name] = newRobot
+
+    # every robot pose updates here
+    # data is PoseWithCovarianceStamped
+    def updateRobotPose(self, data):
+        frame_id = data.data.header.frame_id
+        if len(frame_id) == 5:
+            robot_to_update = self.activeRobotDictionary['trina2']
+        else:
+            #this relies on the frame_id having a prepended namespace to identify which robot to update
+            #dunno if this will happen or not e.g. '/trina2_1/odom'
+            robot_name = frame_id[1:-5]  #removes the / from beginning and /odom from the end
+            robot_to_update = self.activeRobotDictionary[robot_name]
+        robot_to_update.pose = data.data
 
     # call the methods below in whatever loop this node uses
     # TODO: Nick, depending on the name of the robot, add a list of robots on the left side of the GUI
     def publishRobotStates(self):
         # ask each robot to publish in a list comprehension
-        [self.statePublisherForOperator.publish(robot) for robot in self.activeRobotDictionary.values()]
+        robotList = RobotArr()
+        for robot in self.activeRobotDictionary.values():
+            robotList.robots.append(robot)
+
+        self.statePublisherForOperator.publish(robotList)
+        self.statePublisherForSupervisor.publish(robotList)
 
 
     def publishRobotsLeftInQueue(self):
