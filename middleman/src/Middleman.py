@@ -35,6 +35,8 @@ class Middleman():
         }
         # dictionary of all active robots
         self.activeRobotDictionary = {}
+        # dictionary of all active robot amcl topics
+        self.activeRobotAMCLTopics = {}
 
         #operator queue
         self.robotsForOperator = []
@@ -49,6 +51,8 @@ class Middleman():
         rospy.Subscriber("/robot/stuck", String, self.passRobotToQueueForOperator)
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
+
+        #rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.updateRobotPose)
 
 
         #publishers
@@ -171,30 +175,35 @@ class Middleman():
         newRobot.name = data.data
         newRobot.status = "OK"
         newRobot.currentTask = "IDLE"
-        rospy.Subscriber(newRobot.name+'/amcl_pose', PoseWithCovarianceStamped, self.updateRobotPose)
+        #newRobot.name+
+        #print(newRobot.name+'/amcl_pose')
+        self.activeRobotAMCLTopics[newRobot.name] = '/amcl_pose' #rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.updateRobotPose)
         # if the robot is not already in the dictionary
         if(newRobot.name not in self.activeRobotDictionary.keys()):
             self.activeRobotDictionary[newRobot.name] = newRobot
 
     # every robot pose updates here
     # data is PoseWithCovarianceStamped
-    def updateRobotPose(self, data):
-        frame_id = data.data.header.frame_id
-        if len(frame_id) == 5:
-            robot_to_update = self.activeRobotDictionary['trina2']
-        else:
-            #this relies on the frame_id having a prepended namespace to identify which robot to update
-            #dunno if this will happen or not e.g. '/trina2_1/odom'
-            robot_name = frame_id[1:-5]  #removes the / from beginning and /odom from the end
-            robot_to_update = self.activeRobotDictionary[robot_name]
-        robot_to_update.pose = data.data
+    #def updateRobotPose(self, data):
+        # frame_id = data.header.frame_id
+        # print(len(frame_id))
+        # if len(frame_id) == 5:
+        #     robot_to_update = self.activeRobotDictionary['trina2']
+        # else:
+        #     #this relies on the frame_id having a prepended namespace to identify which robot to update
+        #     #dunno if this will happen or not e.g. '/trina2_1/odom'
+        #     robot_name = frame_id[1:-5]  #removes the / from beginning and /odom from the end
+        #     robot_to_update = self.activeRobotDictionary[robot_name]
+        # robot_to_update.pose = data
 
     # call the methods below in whatever loop this node uses
     # TODO: Nick, depending on the name of the robot, add a list of robots on the left side of the GUI
     def publishRobotStates(self):
-        # ask each robot to publish in a list comprehension
+        # ask each robot to publish
         robotList = RobotArr()
         for robot in self.activeRobotDictionary.values():
+            pose_msg = rospy.wait_for_message(self.activeRobotAMCLTopics[robot.name], PoseWithCovarianceStamped, .25)
+            robot.pose = pose_msg
             robotList.robots.append(robot)
 
         self.statePublisherForOperator.publish(robotList)
