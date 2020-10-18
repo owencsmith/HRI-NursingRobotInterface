@@ -41,7 +41,7 @@ class Middleman():
         #operator queue
         self.robotsForOperator = []
 
-        self.rate = rospy.Rate(1)
+        self.rate = rospy.Rate(5)
 
         #TODO:
         rospy.Subscriber("/supervisor/nav_task", String, self.processNavTask)
@@ -51,8 +51,7 @@ class Middleman():
         rospy.Subscriber("/robot/stuck", String, self.passRobotToQueueForOperator)
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
-
-        #rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.updateRobotPose)
+        rospy.sleep(1)
 
 
         #publishers
@@ -60,12 +59,12 @@ class Middleman():
         # TODO: when operator is done with a robot, pop from list and send new one using Service/Client (not publisher) -- N/A anymore
 
         self.sendNewRobotToOperator = rospy.Publisher('/operator/new_robot', Robot, queue_size=10)
-        self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool, queue_size = 10)
-        self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size = 10)
-        self.robotsLeftInQueue = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
+        self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool, queue_size=10)
+        self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size=10)
+        #self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
-        pass
+        rospy.sleep(1)
 
 
     def processNavTask(self, data):
@@ -90,7 +89,10 @@ class Middleman():
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.w = 1
         poseStamped.pose.orientation.z = .16
-        rospy.Publisher(currentRobot.namespace+'/move_base_simple/goal', PoseStamped, queue_size=10).publish(poseStamped)
+        goal_publisher = rospy.Publisher(currentRobot.namespace+'/move_base_simple/goal', PoseStamped, queue_size=10)
+        rospy.sleep(1)
+        goal_publisher.publish(poseStamped)
+        print('publishing nav goal')
 
     def passRobotToQueueForOperator(self, data):
         print("Passing robot")
@@ -101,9 +103,11 @@ class Middleman():
         #change status to OPC
         #task code doesn't change so that the operator knows whats up
         robotThatNeedsHelp.status = "OPC"
-        #add the robot to the operator queue
-        self.robotsForOperator.append(robotThatNeedsHelp)
-
+        if len(self.robotsForOperator) == 0:
+            self.sendNewRobotToOperator.publish(robotThatNeedsHelp)
+        else:
+            #add the robot to the operator queue
+            self.robotsForOperator.append(robotThatNeedsHelp)
         pass
 
     def advanceRobotHelpQueue(self,data):
@@ -202,8 +206,12 @@ class Middleman():
         # ask each robot to publish
         robotList = RobotArr()
         for robot in self.activeRobotDictionary.values():
-            pose_msg = rospy.wait_for_message(self.activeRobotAMCLTopics[robot.name], PoseWithCovarianceStamped, .25)
-            robot.pose = pose_msg
+            try:
+                pose_msg = rospy.wait_for_message(self.activeRobotAMCLTopics[robot.name], PoseWithCovarianceStamped, .05)
+                robot.pose = pose_msg
+            except:
+                pass
+                #print("Robot "+robot.name + " pose timed out.")
             robotList.robots.append(robot)
 
         self.statePublisherForOperator.publish(robotList)
@@ -211,7 +219,7 @@ class Middleman():
 
 
     def publishRobotsLeftInQueue(self):
-        self.robotsLeftInQueue.publish()
+        self.robotsLeftInQueue.publish(len(self.robotsForOperator))
 
 middleman = Middleman()
 while not rospy.is_shutdown():
