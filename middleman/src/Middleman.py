@@ -4,22 +4,23 @@ from std_msgs.msg import *
 from middleman.msg import Robot, RobotArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 
-#TODO: Method to create a new robot and add to dictionary
+
+# TODO: Method to create a new robot and add to dictionary
 # if robot is not in dictionary then add it to the dictionary -- Done
 
-#TODO: Pickup ros odom messages to detect new robots
+# TODO: Pickup ros odom messages to detect new robots
 # a robot sends a message that its booted, we pick that up
 # Launch a node with each robot that tells the middle man that a new robot exists
 # Use the name of the robot to determine all the topics for that specific robot since they are all the same
 # except the name
 
-#TODO: We're proabbly going to have to have a topic for each of the robot joints as well.... Robot is going
+# TODO: We're proabbly going to have to have a topic for each of the robot joints as well.... Robot is going
 # to encapsulate a lot of information
 
 
 class Middleman():
     def __init__(self):
-        rospy.init_node("middleman", anonymous = True)
+        rospy.init_node("middleman", anonymous=True)
         # dictionary for task codes
         """
         Task codes:
@@ -30,21 +31,33 @@ class Middleman():
             IDLE: Robot has no current task
             SOS: Supervisor passes control of the robot to the operator
         """
-        self.taskCodes = {
-
+        self.taskPrios = {
+            'NAV': 25,
+            'CLN': 50,
+            'HLP': 100,
+            'DLV': 200
         }
+        self.taskFns = {
+            'NAV': self.navTask,
+            'CLN': self.clnTask,
+            'HLP': self.hlpTask,
+            'DLV': self.dlvTask
+        }
+
         # dictionary of all active robots
         self.activeRobotDictionary = {}
         # dictionary of all active robot amcl topics
         self.activeRobotAMCLTopics = {}
 
-        #operator queue
+        # operator queue
         self.robotsForOperator = []
 
         self.rate = rospy.Rate(5)
 
-        #TODO:
-        rospy.Subscriber("/supervisor/nav_task", String, self.processNavTask)
+        # TODO: Change /supervisor/nav_task to /task to handle all task assignment processes
+        # Task Strings: 'task_name robot_name X Y [vars ...]'
+        # DLV vars = fromX fromY
+        rospy.Subscriber("/supervisor/task", String, self.processTask)
         rospy.Subscriber("/supervisor/sos", String, self.passRobotToQueueForOperator)
         rospy.Subscriber("/operator/done_helping", String, self.advanceRobotHelpQueue)
         rospy.Subscriber("/operator/request_extra_views_from_robot", String, self.sendAnotherRobotForCameraViews)
@@ -53,34 +66,56 @@ class Middleman():
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
         rospy.sleep(1)
 
-
-        #publishers
+        # publishers
         # TODO: Make our own Robot message with fields of robot object -- Done
         # TODO: when operator is done with a robot, pop from list and send new one using Service/Client (not publisher) -- N/A anymore
 
         self.sendNewRobotToOperator = rospy.Publisher('/operator/new_robot', Robot, queue_size=10)
-        self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool, queue_size=10)
+        self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool,
+                                                             queue_size=10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size=10)
-        #self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
+        # self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         rospy.sleep(1)
 
+    #check data length >= 4
+    def processTask(self, data):
+        # Task Strings: 'task_name robot_name X Y [vars ...]'
+        # DLV vars = fromX fromY
+        dataList = data.data.split()
+        taskName = dataList[0]
+        robotName = dataList[1]
+        X = dataList[2]
+        Y = dataList[3]
+        print('Split Task Data')
 
-    def processNavTask(self, data):
+        if len(dataList) > 4:
+            variables = dataList[4:]
+        else:
+            variables = None
+
+        #if
+        self.taskFns[taskName](robotName, X, Y, variables=variables)
+        print('Called? Task Function')
+
+    def navTask(self, robotName, X, Y, variables=None):
         print("Processing Nav Goal")
         # parses Robot name XY string and sends to robots movebase
-        dataList = data.data.split()
-        robotName = dataList[0]
-        X = dataList[1]
-        Y = dataList[2]
-        self.sendRobotToPos(robotName, float(X), float(Y))
-        pass
-
-    def sendRobotToPos(self, robotName, X, Y):
         currentRobot = self.activeRobotDictionary[robotName]
         currentRobot.currentTask = "NAV"
-        # worldCoordinates = self.guiCoordinatesToWorldCoordinates([X, Y])
+        self.sendRobotToPos(currentRobot, float(X), float(Y))
+        pass
+
+    def clnTask(self):
+        pass
+    def dlvTask(self):
+        pass
+    def hlpTask(self):
+        pass
+
+
+    def sendRobotToPos(self, currentRobot, X, Y):
         # publish coordinates to move_base of specific robot
         poseStamped = PoseStamped()
         poseStamped.pose.position.x = X
@@ -89,33 +124,33 @@ class Middleman():
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.w = 1
         poseStamped.pose.orientation.z = .16
-        goal_publisher = rospy.Publisher(currentRobot.namespace+'/move_base_simple/goal', PoseStamped, queue_size=10)
+        goal_publisher = rospy.Publisher(currentRobot.namespace + '/move_base_simple/goal', PoseStamped, queue_size=10)
         rospy.sleep(1)
         goal_publisher.publish(poseStamped)
-        print('publishing nav goal')
+        print('Publishing Nav Goal')
 
     def passRobotToQueueForOperator(self, data):
         print("Passing robot")
-        #get robot name
+        # get robot name
         robotName = data.data.split()[0]
-        #uses name to get robot object
+        # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
-        #change status to OPC
-        #task code doesn't change so that the operator knows whats up
+        # change status to OPC
+        # task code doesn't change so that the operator knows whats up
         robotThatNeedsHelp.status = "OPC"
         if len(self.robotsForOperator) == 0:
             self.sendNewRobotToOperator.publish(robotThatNeedsHelp)
         else:
-            #add the robot to the operator queue
+            # add the robot to the operator queue
             self.robotsForOperator.append(robotThatNeedsHelp)
         pass
 
-    def advanceRobotHelpQueue(self,data):
+    def advanceRobotHelpQueue(self, data):
         print("Loading Next Robot")
-        #parse robot name
+        # parse robot name
         robotName = data.data.split()[0]
         robotThatWasHelped = self.activeRobotDictionary[robotName]
-        #This gets published, no need to update supervisor
+        # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
         robotThatWasHelped.currentTask = "IDLE"
         # pop another robot from the queue if queue is not empty
@@ -130,7 +165,7 @@ class Middleman():
         robotThatWillHelp = None
         # Is there an IDLE robot that CAN be used?
         for robot in self.activeRobotDictionary.values():
-            if(robot.currentTask == "IDLE"):
+            if (robot.currentTask == "IDLE"):
                 # find it and grab it from the dictionary
                 robot.currentTask = "HLP"
                 # publish that a robot is on its way
@@ -138,7 +173,7 @@ class Middleman():
                 robotAvailableForHelp = True
                 robotThatWillHelp = robot
                 break
-        if(not robotAvailableForHelp):
+        if (not robotAvailableForHelp):
             return False
         else:
             # parse the string for the robot to navigate to for more views
@@ -165,8 +200,8 @@ class Middleman():
 
     def alertSupervisorRobotIsDone(self):
         print("Robot has finished task. Going to IDLE")
-        #find robot in dicionary
-        #change robot task to IDLE
+        # find robot in dicionary
+        # change robot task to IDLE
         # publish to /supervisor/robots_finished_task that the robot is done
         pass
 
@@ -179,26 +214,27 @@ class Middleman():
         newRobot.name = data.data
         newRobot.status = "OK"
         newRobot.currentTask = "IDLE"
-        #newRobot.name+
-        #print(newRobot.name+'/amcl_pose')
-        self.activeRobotAMCLTopics[newRobot.name] = '/amcl_pose' #rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.updateRobotPose)
+        # newRobot.name+
+        # print(newRobot.name+'/amcl_pose')
+        self.activeRobotAMCLTopics[
+            newRobot.name] = '/amcl_pose'  # rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.updateRobotPose)
         # if the robot is not already in the dictionary
-        if(newRobot.name not in self.activeRobotDictionary.keys()):
+        if (newRobot.name not in self.activeRobotDictionary.keys()):
             self.activeRobotDictionary[newRobot.name] = newRobot
 
     # every robot pose updates here
     # data is PoseWithCovarianceStamped
-    #def updateRobotPose(self, data):
-        # frame_id = data.header.frame_id
-        # print(len(frame_id))
-        # if len(frame_id) == 5:
-        #     robot_to_update = self.activeRobotDictionary['trina2']
-        # else:
-        #     #this relies on the frame_id having a prepended namespace to identify which robot to update
-        #     #dunno if this will happen or not e.g. '/trina2_1/odom'
-        #     robot_name = frame_id[1:-5]  #removes the / from beginning and /odom from the end
-        #     robot_to_update = self.activeRobotDictionary[robot_name]
-        # robot_to_update.pose = data
+    # def updateRobotPose(self, data):
+    # frame_id = data.header.frame_id
+    # print(len(frame_id))
+    # if len(frame_id) == 5:
+    #     robot_to_update = self.activeRobotDictionary['trina2']
+    # else:
+    #     #this relies on the frame_id having a prepended namespace to identify which robot to update
+    #     #dunno if this will happen or not e.g. '/trina2_1/odom'
+    #     robot_name = frame_id[1:-5]  #removes the / from beginning and /odom from the end
+    #     robot_to_update = self.activeRobotDictionary[robot_name]
+    # robot_to_update.pose = data
 
     # call the methods below in whatever loop this node uses
     # TODO: Nick, depending on the name of the robot, add a list of robots on the left side of the GUI
@@ -207,19 +243,20 @@ class Middleman():
         robotList = RobotArr()
         for robot in self.activeRobotDictionary.values():
             try:
-                pose_msg = rospy.wait_for_message(self.activeRobotAMCLTopics[robot.name], PoseWithCovarianceStamped, .05)
+                pose_msg = rospy.wait_for_message(self.activeRobotAMCLTopics[robot.name], PoseWithCovarianceStamped,
+                                                  .05)
                 robot.pose = pose_msg
             except:
                 pass
-                #print("Robot "+robot.name + " pose timed out.")
+                # print("Robot "+robot.name + " pose timed out.")
             robotList.robots.append(robot)
 
         self.statePublisherForOperator.publish(robotList)
         self.statePublisherForSupervisor.publish(robotList)
 
-
     def publishRobotsLeftInQueue(self):
         self.robotsLeftInQueue.publish(len(self.robotsForOperator))
+
 
 middleman = Middleman()
 while not rospy.is_shutdown():
