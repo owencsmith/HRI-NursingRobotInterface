@@ -107,11 +107,34 @@ class Middleman():
         self.sendRobotToPos(currentRobot, float(X), float(Y))
         pass
 
-    def clnTask(self):
+    def clnTask(self, robotName, X, Y, variables=None):
+        print("Processing Cleaning Task")
+        # parses Robot name XY string and sends to robots movebase
+        currentRobot = self.activeRobotDictionary[robotName]
+        currentRobot.currentTask = "CLN"
+        self.sendRobotToPos(currentRobot, float(X), float(Y))
         pass
-    def dlvTask(self):
+
+    def dlvTask(self, robotName, X, Y, variables=None):
+        print("Processing Delivery Task")
+        # parses Robot name XY string and sends to robots movebase
+        data = variables.split(" ")
+        fromX = data[0]
+        fromY = data[1]
+        currentRobot = self.activeRobotDictionary[robotName]
+        currentRobot.currentTask = "DLV"
+        toX = X
+        toY = Y
+        self.sendRobotToPos(currentRobot, float(fromX), float(fromY))
         pass
-    def hlpTask(self):
+
+
+    def hlpTask(self, robotName, X, Y, variables=None):
+        print("Processing Help Task")
+        # parses Robot name XY string and sends to robots movebase
+        currentRobot = self.activeRobotDictionary[robotName]
+        currentRobot.currentTask = "HLP"
+        self.sendRobotToPos(currentRobot, float(X), float(Y))
         pass
 
 

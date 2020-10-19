@@ -10,4 +10,4 @@ class Task:
 
     def getPriority(self):
         timeElapsed_mins = (time.time()-self.addedToQueue_) % 60
-        return timeElapsed_mins * self.priority
+        return timeElapsed_mins * self.priority_
