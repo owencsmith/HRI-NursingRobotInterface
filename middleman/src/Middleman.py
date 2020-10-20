@@ -7,10 +7,14 @@ from Task import *
 
 
 
-# TODO: Method to create a new robot and add to dictionary
-# if robot is not in dictionary then add it to the dictionary -- Done
 
-# TODO: Pickup ros odom messages to detect new robots
+#TODO:
+# Task functions should just take in the task as the function parameters
+# Task class is going to need X and Y members, and extra variables
+# When process the task, we should create the task object outside of if/else
+
+
+# if robot is not in dictionary then add it to the dictionary -- Done
 # a robot sends a message that its booted, we pick that up
 # Launch a node with each robot that tells the middle man that a new robot exists
 # Use the name of the robot to determine all the topics for that specific robot since they are all the same
@@ -196,6 +200,7 @@ class Middleman():
         self.sendNewRobotToOperator.publish(nextRobot)
         pass
 
+    #TODO: add help task to the priority queue or active queue
     def sendAnotherRobotForCameraViews(self, data):
         print("Requesting another robot for camera views")
         robotAvailableForHelp = False
@@ -279,6 +284,11 @@ class Middleman():
         # ask each robot to publish
         robotList = RobotArr()
         for robot in self.activeRobotDictionary.values():
+            # check for IDLE robots TODO: LOOK HERE WE DIDN'T FINISH
+            # if(robot.currentTask == "IDLE"):
+            #     # assign robot a task iin th priority queue
+            #     highestPriorityTask = self.taskPriorityQueue.pop()
+            #     self.taskFns[highestPriorityTask.name]
             try:
                 pose_msg = rospy.wait_for_message(self.activeRobotAMCLTopics[robot.name], PoseWithCovarianceStamped,
                                                   .05)
