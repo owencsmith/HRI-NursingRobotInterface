@@ -53,6 +53,8 @@ add_message_files(
    FILES
    Robot.msg
    RobotArr.msg
+   TaskMsgArr.msg
+   TaskMsg.msg
  )
 
 ## Generate services in the 'srv' folder

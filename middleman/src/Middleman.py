@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import *
-from middleman.msg import Robot, RobotArr
+from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from Task import *
+
 
 
 # TODO: Method to create a new robot and add to dictionary
@@ -44,6 +46,10 @@ class Middleman():
             'DLV': self.dlvTask
         }
 
+        # list of active tasks happening RN
+        self.activeTaskList = []
+        # list of tasks that are yet to be assigned
+        self.taskPriorityQueue = []
         # dictionary of all active robots
         self.activeRobotDictionary = {}
         # dictionary of all active robot amcl topics
@@ -77,10 +83,14 @@ class Middleman():
         # self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
+        self.taskListPublisher= rospy.Publisher('/supervisor/taskList', TaskMsgArr, queue_size=10)
         rospy.sleep(1)
 
     #check data length >= 4
+    # process task determines which queue to put the task in
     def processTask(self, data):
+        # Have to know if the task has been unnassigned
+        # have to know what the task is
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
         dataList = data.data.split()
@@ -95,8 +105,12 @@ class Middleman():
         else:
             variables = None
 
-        #if
-        self.taskFns[taskName](robotName, X, Y, variables=variables)
+        if robotName != "unassigned":
+            self.taskFns[taskName](robotName, X, Y, variables=variables)
+            self.activeTaskList.append(Task(taskName, self.taskPrios[taskName], robotName = robotName))
+        else:
+            self.taskPriorityQueue.append(Task(taskName, self.taskPrios[taskName], robotName = robotName))
+            self.taskPriorityQueue.sort(key=lambda task: task.getPriority())
         print('Called? Task Function')
 
     def navTask(self, robotName, X, Y, variables=None):
@@ -280,9 +294,21 @@ class Middleman():
     def publishRobotsLeftInQueue(self):
         self.robotsLeftInQueue.publish(len(self.robotsForOperator))
 
+    def publishTaskList(self):
+        taskMsgList = TaskMsgArr()
+        self.taskPriorityQueue.sort(key=lambda task: task.getPriority())
+        for task in (self.activeTaskList + self.taskPriorityQueue):
+            taskMsg = TaskMsg()
+            taskMsg.taskName = task.taskName
+            taskMsg.robotName = task.robotName
+            taskMsgList.taskMsgs.append(taskMsg)
+        self.taskListPublisher.publish(taskMsgList)
+
+
 
 middleman = Middleman()
 while not rospy.is_shutdown():
     middleman.publishRobotStates()
     middleman.publishRobotsLeftInQueue()
+    middleman.publishTaskList()
     middleman.rate.sleep()
