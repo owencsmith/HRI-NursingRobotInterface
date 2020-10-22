@@ -9,10 +9,8 @@ from Task import *
 
 
 
-# if robot is not in dictionary then add it to the dictionary -- Done
-# a robot sends a message that its booted, we pick that up
-# Launch a node with each robot that tells the middle man that a new robot exists
-# Use the name of the robot to determine all the topics for that specific robot since they are all the same
+
+# TODO: Use the name of the robot to determine all the topics for that specific robot since they are all the same
 # except the name
 
 # TODO: We're proabbly going to have to have a topic for each of the robot joints as well.... Robot is going
@@ -60,7 +58,6 @@ class Middleman():
 
         self.rate = rospy.Rate(5)
 
-        # TODO: Change /supervisor/nav_task to /task to handle all task assignment processes
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
         rospy.Subscriber("/supervisor/task", String, self.processTask)
@@ -73,9 +70,6 @@ class Middleman():
         rospy.sleep(1)
 
         # publishers
-        # TODO: Make our own Robot message with fields of robot object -- Done
-        # TODO: when operator is done with a robot, pop from list and send new one using Service/Client (not publisher) -- N/A anymore
-
         self.sendNewRobotToOperator = rospy.Publisher('/operator/new_robot', Robot, queue_size=10)
         self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool,
                                                              queue_size=10)
@@ -84,6 +78,7 @@ class Middleman():
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.taskListPublisher = rospy.Publisher('/supervisor/taskList', TaskMsgArr, queue_size=10)
+        self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size = 10)
         rospy.sleep(1)
 
     #check data length >= 4
@@ -97,8 +92,8 @@ class Middleman():
         taskName = dataList[0]
         # passed as unassigned if task is not assigned
         robotName = dataList[1]
-        X = dataList[2]
-        Y = dataList[3]
+        X = float(dataList[2])
+        Y = float(dataList[3])
         print('Split Task Data')
 
         if len(dataList) > 4:
@@ -107,49 +102,55 @@ class Middleman():
             variables = None
 
         newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, variables)
+        newTaskMsg = newTask.convertTaskToTaskMsg()
         if robotName != "unassigned":
-            self.taskFns[taskName](taskName)
+            self.taskFns[taskName](newTaskMsg)
             self.activeTaskList.append(newTask)
         else:
             self.taskPriorityQueue.append(newTask)
             self.taskPriorityQueue.sort(key=lambda task: task.getPriority())
         print('Called Task Function')
 
-    def navTask(self, task):
+    def navTask(self, taskMsg):
         print("Processing Nav Goal")
         # parses Robot name XY string and sends to robots movebase
-        currentRobot = self.activeRobotDictionary[task.robotName]
-        currentRobot.currentTask = "NAV"
-        self.sendRobotToPos(currentRobot, float(task.X), float(task.Y))
+        currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.currentTask = taskMsg
+        currentRobot.currentTaskName = taskMsg.taskName
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
         pass
 
-    def clnTask(self, task):
+    def clnTask(self, taskMsg):
         print("Processing Cleaning Task")
         # parses Robot name XY string and sends to robots movebase
-        currentRobot = self.activeRobotDictionary[task.robotName]
-        currentRobot.currentTask = "CLN"
-        self.sendRobotToPos(currentRobot, float(task.X), float(task.Y))
+        currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.currentTask = taskMsg
+        currentRobot.currentTaskName = taskMsg.taskName
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
         pass
 
-    def dlvTask(self, task):
-        print("Processing Delivery Task")
-        # parses Robot name XY string and sends to robots movebase
-        data = task.variables.split()
-        toX = data[0]
-        toY = data[1]
-        currentRobot = self.activeRobotDictionary[task.robotName]
-        currentRobot.currentTask = "DLV"
-        fromX = task.X
-        fromY = task.Y
-        self.sendRobotToPos(currentRobot, float(fromX), float(fromY))
+    #@TODO
+    def dlvTask(self, taskMsg):
+        # print("Processing Delivery Task")
+        # # parses Robot name XY string and sends to robots movebase
+        # data = task.variables.split()
+        # toX = data[0]
+        # toY = data[1]
+        # currentRobot = self.activeRobotDictionary[task.robotName]
+        # currentRobot.currentTask = task
+        # currentRobot.currentTaskName = task.taskName
+        # fromX = task.X
+        # fromY = task.Y
+        # self.sendRobotToPos(currentRobot, float(fromX), float(fromY))
         pass
 
-    def hlpTask(self, task):
+    def hlpTask(self, taskMsg):
         print("Processing Help Task")
         # parses Robot name XY string and sends to robots movebase
-        currentRobot = self.activeRobotDictionary[task.robotName]
-        currentRobot.currentTask = "HLP"
-        self.sendRobotToPos(currentRobot, float(task.X), float(task.Y))
+        currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.currentTask = taskMsg
+        currentRobot.currentTaskName = taskMsg.taskName
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
         pass
 
     def sendRobotToPos(self, currentRobot, X, Y):
@@ -175,15 +176,14 @@ class Middleman():
         # change status to OPC
         # task code doesn't change so that the operator knows whats up
         robotThatNeedsHelp.status = "OPC"
-        if len(self.robotsForOperator) == 0:
-            self.sendNewRobotToOperator.publish(robotThatNeedsHelp)
-        else:
-            # add the robot to the operator queue
-            self.robotsForOperator.append(robotThatNeedsHelp)
+        self.robotsForOperator.append(robotThatNeedsHelp)
         pass
 
+    #@TODO: FIGURE OUT ROBOT INTERATION WITH OPERATOR
     def advanceRobotHelpQueue(self, data):
         print("Loading Next Robot")
+        # sort robots by their priority
+        self.robotsForOperator.sort(key=lambda robot: robot.currentTask.taskPriority)
         # parse robot name
         robotName = data.data.split()[0]
         robotThatWasHelped = self.activeRobotDictionary[robotName]
@@ -230,12 +230,6 @@ class Middleman():
     def worldCoordinatesToGuiCoordinates(self, coordinates):
         pass
 
-    def sendTaskToRobot(self):
-        print("Assigning task to robot")
-        # if else chain depending on task or dictionary of task code
-        # linking to function
-        pass
-
     def alertSupervisorRobotIsDone(self):
         print("Robot has finished task. Going to IDLE")
         # find robot in dicionary
@@ -251,7 +245,8 @@ class Middleman():
         newRobot = Robot()
         newRobot.name = data.data
         newRobot.status = "OK"
-        newRobot.currentTask = "IDLE"
+        newRobot.currentTaskName = "IDLE"
+        newRobot.currentTask = TaskMsg()
         # newRobot.name+
         # print(newRobot.name+'/amcl_pose')
         self.activeRobotAMCLTopics[
@@ -295,13 +290,14 @@ class Middleman():
     def assignIdleRobots(self):
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
-            if robot.currentTask == "IDLE" and len(self.taskPriorityQueue) > 0:
+            if robot.currentTaskName == "IDLE" and len(self.taskPriorityQueue) > 0:
                 # assign robot a task in th priority queue
                 highestPriorityTask = self.taskPriorityQueue.pop()
                 highestPriorityTask.robotName = robot.name
-                # TODO: Change taskName in robot.currentTask to a TaskMsg object
-                robot.currentTask = highestPriorityTask.taskName
-                self.taskFns[highestPriorityTask.taskName](highestPriorityTask)
+                taskMsg = highestPriorityTask.convertTaskToTaskMsg()
+                robot.currentTask = taskMsg
+                robot.currentTaskName = taskMsg.taskName
+                self.taskFns[highestPriorityTask.taskName](taskMsg)
                 self.activeTaskList.append(highestPriorityTask)
 
     def publishRobotsLeftInQueue(self):
@@ -311,23 +307,26 @@ class Middleman():
         taskMsgList = TaskMsgArr()
         self.taskPriorityQueue.sort(key=lambda t: t.getPriority())
         for task in (self.activeTaskList + self.taskPriorityQueue):
-            taskMsg = TaskMsg()
-            taskMsg.taskName = task.taskName
-            taskMsg.robotName = task.robotName
-            taskMsgList.taskMsgs.append(taskMsg)
+            # turn object into Msg type to publish
+            taskMsg = task.convertTaskToTaskMsg()
         self.taskListPublisher.publish(taskMsgList)
 
     # When a given amount of time has passed, check for reassignment of robot to highest priority task in the priority
     # queue
-    # TODO: Let supervisor UI know this is happening in some way
     def dynamicReassignmentCheck(self):
-        fiveMinutes = 300
+        fiveMinutes = 60
         if time.time() - self.reassignmentCounter > fiveMinutes and len(self.taskPriorityQueue) > 0:
             print("Time's Up")
             highestPriorityTask = self.taskPriorityQueue[-1]
             for activeTask in self.activeTaskList:
                 if highestPriorityTask.getPriority() > activeTask.getPriority():
                     print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(highestPriorityTask.getPriority()))
+                    swappedTasks = TaskMsgArr()
+                    # swap the active task with high  [Active, High Priority]
+                    # TODO: @NICK make a popup that the supervisor sees to know this happened
+                    swappedTasks.taskMsgs.append(activeTask.convertTaskToTaskMsg())
+                    swappedTasks.taskMsgs.append(highestPriorityTask.convertTaskToTaskMsg())
+                    self.taskReassignmentPublisher.publish(swappedTasks)
                     #remove from priority queue
                     self.taskPriorityQueue.pop()
                     #reassign robot name
@@ -337,12 +336,12 @@ class Middleman():
                     #remove now inactive from activeList
                     self.activeTaskList.remove(activeTask)
                     robotBeingReassigned = self.activeRobotDictionary[activeTask.robotName]
-                    robotBeingReassigned.currentTask = highestPriorityTask.taskName
+                    robotBeingReassigned.currentTask = highestPriorityTask.convertTaskToTaskMsg()
+                    robotBeingReassigned.currentTaskName = highestPriorityTask.taskName
                     #reassign active task to unassigned status
                     activeTask.robotName = 'unassigned'
                     #add previously active task to priority queue
                     self.taskPriorityQueue.append(activeTask)
-
                     self.reassignmentCounter = time.time()
                     return
             self.reassignmentCounter = time.time()

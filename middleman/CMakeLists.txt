@@ -51,10 +51,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
    FILES
-   Robot.msg
-   RobotArr.msg
    TaskMsgArr.msg
    TaskMsg.msg
+   Robot.msg
+   RobotArr.msg
  )
 
 ## Generate services in the 'srv' folder
