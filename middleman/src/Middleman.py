@@ -55,6 +55,7 @@ class Middleman():
 
         # operator queue
         self.robotsForOperator = []
+        self.operatorIsBusy = False
 
         self.rate = rospy.Rate(5)
 
@@ -162,11 +163,19 @@ class Middleman():
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.w = 1
         poseStamped.pose.orientation.z = .16
-        goal_publisher = rospy.Publisher(currentRobot.namespace + '/move_base_simple/goal', PoseStamped, queue_size=10)
+        topic = ''
+        if currentRobot.name == 'trina2':
+            topic = '/move_base_simple/goal'
+        else:
+            topic = currentRobot.name+'/move_base_simple/goal'
+        print(topic)
+        goal_publisher = rospy.Publisher(topic, PoseStamped, queue_size=10)
         rospy.sleep(1)
         goal_publisher.publish(poseStamped)
         print('Publishing Nav Goal')
 
+    # When sos message is published
+    # Add to queue, sort
     def passRobotToQueueForOperator(self, data):
         print("Passing robot")
         # get robot name
@@ -177,24 +186,31 @@ class Middleman():
         # task code doesn't change so that the operator knows whats up
         robotThatNeedsHelp.status = "OPC"
         self.robotsForOperator.append(robotThatNeedsHelp)
-        pass
-
-    #@TODO: FIGURE OUT ROBOT INTERATION WITH OPERATOR
-    def advanceRobotHelpQueue(self, data):
-        print("Loading Next Robot")
-        # sort robots by their priority
         self.robotsForOperator.sort(key=lambda robot: robot.currentTask.taskPriority)
+
+        # - check this boolean
+        #   if busy - pass
+        #   if idle - pop highest priority if list has content
+        if not self.operatorIsBusy:
+            robotToHelp = self.robotsForOperator.pop()
+            self.sendNewRobotToOperator.publish(robotToHelp)
+            self.operatorIsBusy = True
+
+    # Operator wants next robot, if available
+    def advanceRobotHelpQueue(self, data):
+        self.operatorIsBusy = False
+
         # parse robot name
         robotName = data.data.split()[0]
         robotThatWasHelped = self.activeRobotDictionary[robotName]
         # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
         robotThatWasHelped.currentTask = "IDLE"
-        # pop another robot from the queue if queue is not empty
-        nextRobot = self.robotsForOperator.pop()
-        # publish that robot to /operator/new_robot
-        self.sendNewRobotToOperator.publish(nextRobot)
-        pass
+
+        if len(self.robotsForOperator) > 0:
+            robotToHelp = self.robotsForOperator.pop()
+            self.sendNewRobotToOperator.publish(robotToHelp)
+            self.operatorIsBusy = True
 
     #TODO: add help task to the priority queue or active queue
     def sendAnotherRobotForCameraViews(self, data):
@@ -249,8 +265,12 @@ class Middleman():
         newRobot.currentTask = TaskMsg()
         # newRobot.name+
         # print(newRobot.name+'/amcl_pose')
-        self.activeRobotAMCLTopics[
-            newRobot.name] = '/amcl_pose'  # rospy.Subscriber('/amcl_pose', PoseWithCovarianceStamped, self.updateRobotPose)
+        if newRobot.name == 'trina2':
+            self.activeRobotAMCLTopics[
+                newRobot.name] = '/amcl_pose'
+        else:
+            self.activeRobotAMCLTopics[
+            newRobot.name] = newRobot.name+'/amcl_pose'
         # if the robot is not already in the dictionary
         if (newRobot.name not in self.activeRobotDictionary.keys()):
             self.activeRobotDictionary[newRobot.name] = newRobot
@@ -309,6 +329,7 @@ class Middleman():
         for task in (self.activeTaskList + self.taskPriorityQueue):
             # turn object into Msg type to publish
             taskMsg = task.convertTaskToTaskMsg()
+            taskMsgList.taskMsgs.append(taskMsg)
         self.taskListPublisher.publish(taskMsgList)
 
     # When a given amount of time has passed, check for reassignment of robot to highest priority task in the priority

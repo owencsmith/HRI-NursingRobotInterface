@@ -51,8 +51,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
    FILES
-   TaskMsgArr.msg
    TaskMsg.msg
+   TaskMsgArr.msg
    Robot.msg
    RobotArr.msg
  )

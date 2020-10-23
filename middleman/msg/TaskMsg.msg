@@ -2,5 +2,5 @@ string taskName
 string ID
 float64 X
 float64 Y
-float taskPriority
+float64 taskPriority
 string robotName
