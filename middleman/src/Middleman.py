@@ -34,13 +34,15 @@ class Middleman():
             'NAV': 25,
             'CLN': 50,
             'HLP': 100,
-            'DLV': 200
+            'DLV': 200,
+            'IDLE':0
         }
         self.taskFns = {
             'NAV': self.navTask,
             'CLN': self.clnTask,
             'HLP': self.hlpTask,
-            'DLV': self.dlvTask
+            'DLV': self.dlvTask,
+            'IDLE': self.idleTask
         }
 
         self.reassignmentCounter = time.time()
@@ -154,6 +156,10 @@ class Middleman():
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
         pass
 
+    #do nothing
+    def idleTask(self, taskMsg):
+       pass
+
     def sendRobotToPos(self, currentRobot, X, Y):
         # publish coordinates to move_base of specific robot
         poseStamped = PoseStamped()
@@ -177,9 +183,9 @@ class Middleman():
     # When sos message is published
     # Add to queue, sort
     def passRobotToQueueForOperator(self, data):
-        print("Passing robot")
         # get robot name
         robotName = data.data.split()[0]
+        print("Passing robot: ", robotName)
         # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
         # change status to OPC
@@ -205,10 +211,14 @@ class Middleman():
         robotThatWasHelped = self.activeRobotDictionary[robotName]
         # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
-        robotThatWasHelped.currentTask = "IDLE"
+        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, None)
+        idleTaskMsg = idleTask.convertTaskToTaskMsg()
+        robotThatWasHelped.currentTask = idleTaskMsg
+        robotThatWasHelped.currentTaskName = idleTaskMsg.taskName
 
         if len(self.robotsForOperator) > 0:
             robotToHelp = self.robotsForOperator.pop()
+            print("Sending new robot: ", robotToHelp.name, " ,to operator.")
             self.sendNewRobotToOperator.publish(robotToHelp)
             self.operatorIsBusy = True
 
@@ -261,8 +271,12 @@ class Middleman():
         newRobot = Robot()
         newRobot.name = data.data
         newRobot.status = "OK"
-        newRobot.currentTaskName = "IDLE"
-        newRobot.currentTask = TaskMsg()
+
+        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, None)
+        initialTaskMsg = initialTask.convertTaskToTaskMsg()
+        newRobot.currentTaskName = initialTaskMsg.taskName
+        newRobot.currentTask = initialTaskMsg
+
         # newRobot.name+
         # print(newRobot.name+'/amcl_pose')
         if newRobot.name == 'trina2':
@@ -301,7 +315,6 @@ class Middleman():
                 robot.pose = pose_msg
             except:
                 pass
-                # print("Robot "+robot.name + " pose timed out.")
             robotList.robots.append(robot)
 
         self.statePublisherForOperator.publish(robotList)
