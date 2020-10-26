@@ -13,10 +13,10 @@ designerFile = "SupervisorUI.ui"
 map = "Maps/Hospital"
 
 class SupervisorUI(QtWidgets.QMainWindow):
-    def __init__(self):
+    def __init__(self, width, height):
         super(SupervisorUI, self).__init__()
         self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
-        self.setFixedSize(1600, 1080)
+        self.fitToScreen(width, height)
         self.AsyncFunctionsThread = AsyncFunctionsThread(self)
         self.AsyncFunctionsThread.signal.connect(self.AsyncFunctionsThreadCallback)
         self.SideMenuThread = SideMenuThread()
@@ -126,6 +126,19 @@ class SupervisorUI(QtWidgets.QMainWindow):
         print(" ")
         self.SupervisorMap.centerOn(center-offset)
 
+    def fitToScreen(self, width, height):
+        #The app should have the same aspect ratio regardless of the computer's
+        #aspect ratio
+        desAspX = 16
+        desAspY = 9
+        if width/height>desAspX/desAspY:
+            windowHeight = height*0.75
+            windowWidth = windowHeight*desAspX/desAspY
+        else:
+            windowWidth = width*0.75
+            windowHeight = windowWidth*desAspY/desAspX
+        self.setFixedSize(windowWidth, windowHeight)
+
 class SideMenuThread(QThread):
     signal = pyqtSignal('PyQt_PyObject')
     def __init__(self):
@@ -153,6 +166,8 @@ if __name__ == '__main__':
     #rospy.init_node('SupervisorUI')
     #rospy.sleep(.5)
     app = QApplication(sys.argv)
-    window = SupervisorUI()
+    screen = app.primaryScreen()
+    size = screen.size()
+    window = SupervisorUI(size.width(), size.height())
     window.show()
     sys.exit(app.exec_())
