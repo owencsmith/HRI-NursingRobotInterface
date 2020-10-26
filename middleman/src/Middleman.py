@@ -5,6 +5,7 @@ import rospy
 from std_msgs.msg import *
 from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from middleman.srv import TaskString, TaskStringResponse
 from Task import *
 
 
@@ -84,6 +85,9 @@ class Middleman():
         self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size = 10)
         rospy.sleep(1)
 
+        # servers
+        self.taskCodeServer = rospy.Service('/supervisor/taskCodes', TaskString, self.sendTaskCodesToSupervisor)
+
     #check data length >= 4
     # process task determines which queue to put the task in
     def processTask(self, data):
@@ -132,10 +136,15 @@ class Middleman():
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
         pass
 
-    #@TODO
+    #@TODO without autonomy work the same as nav task
     def dlvTask(self, taskMsg):
-        # print("Processing Delivery Task")
-        # # parses Robot name XY string and sends to robots movebase
+        print("Processing Delivery Task")
+        # parses Robot name XY string and sends to robots movebase
+        currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.currentTask = taskMsg
+        currentRobot.currentTaskName = taskMsg.taskName
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
+
         # data = task.variables.split()
         # toX = data[0]
         # toY = data[1]
@@ -250,11 +259,9 @@ class Middleman():
             self.sendRobotToPos(str(robotThatWillHelp.name), robotToNavigateToX, robotToNavigateToY)
         pass
 
-    def guiCoordinatesToWorldCoordinates(self, coordinates):
-        pass
-
-    def worldCoordinatesToGuiCoordinates(self, coordinates):
-        pass
+    def sendTaskCodesToSupervisor(self, req):
+        taskCodeStringList = ['Navigation (NAV)', 'Delivery (DLV)', 'Help (HLP)', 'Clean (CLN)']
+        return TaskStringResponse(taskCodeStringList)
 
     def alertSupervisorRobotIsDone(self):
         print("Robot has finished task. Going to IDLE")
