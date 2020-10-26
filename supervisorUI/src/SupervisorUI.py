@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-#import rospy
+import rospy
 from PyQt5 import QtCore, QtWidgets, uic
-from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, QGraphicsView, QHeaderView
+from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
+    QGraphicsView, QHeaderView, QTableWidgetItem
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint, QPointF
@@ -9,8 +10,11 @@ from PyQt5.QtCore import Qt, QLineF, QRectF
 import sys
 import json
 import time
-designerFile = "SupervisorUI.ui"
-map = "Maps/Hospital"
+from std_msgs.msg import *
+from supervisorUI.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+designerFile = "SupervisorUI.ui" #TODO make this visible inside rosrun
+map = "Maps/Hospital" #TODO make this visible inside rosrun
 
 class SupervisorUI(QtWidgets.QMainWindow):
     def __init__(self, width, height):
@@ -22,6 +26,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.mapWidth = 0
         self.numAnimationSteps = 20
         self.fitToScreen(width, height)
+        self.statePublisher = rospy.Subscriber('/supervisor/robotState', RobotArr, self.robotStateCallback)
         self.AsyncFunctionsThread = AsyncFunctionsThread(self)
         self.AsyncFunctionsThread.signal.connect(self.AsyncFunctionsThreadCallback)
         self.SideMenuThread = SideMenuThread()
@@ -130,6 +135,15 @@ class SupervisorUI(QtWidgets.QMainWindow):
         print(" ")
         self.SupervisorMap.centerOn(center-offset)
 
+    def robotStateCallback(self, message):
+        #print("MSG received")
+        self.RobotListTable.setRowCount(0)#clear table
+        for item in message.robots:
+            self.RobotListTable.insertRow(self.RobotListTable.rowCount())
+            self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 0, QTableWidgetItem(item.name))
+            self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 1, QTableWidgetItem(item.currentTaskName))
+
+
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
         #aspect ratio
@@ -204,8 +218,8 @@ class AsyncFunctionsThread(QThread):
         self.signal.emit("Error")
 
 if __name__ == '__main__':
-    #rospy.init_node('SupervisorUI')
-    #rospy.sleep(.5)
+    rospy.init_node('SupervisorUI')
+    rospy.sleep(.5)
     app = QApplication(sys.argv)
     screen = app.primaryScreen()
     size = screen.size()
