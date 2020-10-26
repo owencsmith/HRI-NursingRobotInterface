@@ -65,7 +65,7 @@
       <string>Select Robot</string>
      </property>
     </widget>
-    <widget class="QLabel" name="label">
+    <widget class="QLabel" name="TaskCreatorLabel">
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -73,6 +73,11 @@
        <width>180</width>
        <height>40</height>
       </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>14</pointsize>
+      </font>
      </property>
      <property name="layoutDirection">
       <enum>Qt::RightToLeft</enum>
@@ -94,7 +99,7 @@
       </rect>
      </property>
     </widget>
-    <widget class="QLabel" name="label_2">
+    <widget class="QLabel" name="SelectTaskLabel">
      <property name="geometry">
       <rect>
        <x>20</x>
@@ -110,11 +115,11 @@
       <set>Qt::AlignCenter</set>
      </property>
     </widget>
-    <widget class="QLabel" name="label_3">
+    <widget class="QLabel" name="AssignedRobotTXTLabel">
      <property name="geometry">
       <rect>
-       <x>10</x>
-       <y>170</y>
+       <x>110</x>
+       <y>130</y>
        <width>81</width>
        <height>16</height>
       </rect>
@@ -123,7 +128,7 @@
       <string>Assigned Robot:</string>
      </property>
     </widget>
-    <widget class="QLabel" name="label_4">
+    <widget class="QLabel" name="AssignedRobotLabel">
      <property name="geometry">
       <rect>
        <x>110</x>
@@ -136,7 +141,7 @@
       <string>None</string>
      </property>
     </widget>
-    <widget class="QPushButton" name="pushButton">
+    <widget class="QPushButton" name="SelectLocationBTN">
      <property name="geometry">
       <rect>
        <x>10</x>
@@ -149,7 +154,7 @@
       <string>Select Location</string>
      </property>
     </widget>
-    <widget class="QLabel" name="label_5">
+    <widget class="QLabel" name="XLocLabel">
      <property name="geometry">
       <rect>
        <x>110</x>
@@ -162,7 +167,7 @@
       <string>X: </string>
      </property>
     </widget>
-    <widget class="QLabel" name="label_6">
+    <widget class="QLabel" name="YLocLabel">
      <property name="geometry">
       <rect>
        <x>110</x>

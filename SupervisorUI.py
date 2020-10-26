@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #import rospy
 from PyQt5 import QtCore, QtWidgets, uic
-from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, QGraphicsView
+from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, QGraphicsView, QHeaderView
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint, QPointF
@@ -38,7 +38,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.purple = QColor(qRgb(238, 130, 238))
         self.magenta = QColor(qRgb(255, 0, 255))
         self.white = QColor(qRgb(255, 255, 255))
-        self.scaleFactor = 0.4
+        self.scaleFactor = 0.4*self.mapWidth/1500 #the map was designed for a 1500 pixel square map.This adjusts for the screen size
         self.scene = QGraphicsScene()
         #TODO self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.SupervisorMap.setMouseTracking(True)
@@ -76,6 +76,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
     def SetUpTable(self):
         self.RobotListTable.setColumnCount(2)
         self.RobotListTable.setHorizontalHeaderLabels(('Robot ID', 'Task'))
+        self.RobotListTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
 
     def loadMap(self, mapLocation):
         #These shapes just help make the viewport more centered since it autocenters around the bounding box of the map objects
@@ -114,10 +115,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SupervisorMap.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         if event.angleDelta().y()>0:
             if(self.scaleFactor < 2.0):
-                self.scaleFactor += 0.01
+                self.scaleFactor += 0.01*self.mapWidth/1500
         elif event.angleDelta().y()<0:
-            if (self.scaleFactor > 0.4):
-                self.scaleFactor -= 0.01
+            if (self.scaleFactor > 0.4*self.mapWidth/1500):
+                self.scaleFactor -= 0.01*self.mapWidth/1500
         self.SupervisorMap.scale(self.scaleFactor/oldScale, self.scaleFactor/oldScale)
         #self.SupervisorMap.setTransformationAnchor(QGraphicsView.NoAnchor)
         pointAfterScale = self.SupervisorMap.mapToScene(event.pos())
@@ -153,6 +154,30 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.CreateTaskButton.move(self.windowWidth*0.96-createTaskButtonWidth, self.windowHeight*0.98-createTaskButtonHeight)
         self.SideMenu.move(self.windowWidth, 0)
         self.SideMenu.resize(self.slideInMenuWidth, self.windowHeight)
+
+        self.TaskCreatorLabel.move(self.slideInMenuWidth*0.05, self.windowHeight*0.01)
+        self.TaskCreatorLabel.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.04)
+        self.SelectTaskLabel.move(self.slideInMenuWidth*0.05, self.windowHeight*0.05)
+        self.SelectTaskLabel.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.02)
+        self.SelectTaskCB.move(self.slideInMenuWidth*0.05, self.windowHeight*0.07)
+        self.SelectTaskCB.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.03)
+
+        self.SelectRobot.move(self.slideInMenuWidth*0.05, self.windowHeight*0.11)
+        self.SelectRobot.resize(self.slideInMenuWidth * 0.45, self.windowHeight * 0.04)
+        self.AssignedRobotTXTLabel.move(self.slideInMenuWidth*0.52, self.windowHeight*0.11)
+        self.AssignedRobotTXTLabel.resize(self.slideInMenuWidth*0.45, self.windowHeight*0.02)
+        self.AssignedRobotLabel.move(self.slideInMenuWidth*0.52, self.windowHeight*0.13)
+        self.AssignedRobotLabel.resize(self.slideInMenuWidth*0.45, self.windowHeight*0.02)
+
+        self.SelectLocationBTN.move(self.slideInMenuWidth*0.05, self.windowHeight*0.16)
+        self.SelectLocationBTN.resize(self.slideInMenuWidth * 0.45, self.windowHeight * 0.04)
+        self.XLocLabel.move(self.slideInMenuWidth*0.52, self.windowHeight*0.16)
+        self.XLocLabel.resize(self.slideInMenuWidth*0.45, self.windowHeight*0.02)
+        self.YLocLabel.move(self.slideInMenuWidth*0.52, self.windowHeight*0.18)
+        self.YLocLabel.resize(self.slideInMenuWidth*0.45, self.windowHeight*0.02)
+
+
+
 
 
 class SideMenuThread(QThread):
