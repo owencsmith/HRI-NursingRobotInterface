@@ -16,6 +16,11 @@ class SupervisorUI(QtWidgets.QMainWindow):
     def __init__(self, width, height):
         super(SupervisorUI, self).__init__()
         self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
+        self.slideInMenuWidth = 0 # these all get set by fitToScreen method
+        self.windowHeight = 0
+        self.windowWidth = 0
+        self.mapWidth = 0
+        self.numAnimationSteps = 20
         self.fitToScreen(width, height)
         self.AsyncFunctionsThread = AsyncFunctionsThread(self)
         self.AsyncFunctionsThread.signal.connect(self.AsyncFunctionsThreadCallback)
@@ -40,8 +45,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
         #todo self.scene.mouseMoveEvent = self.MouseMovementEvent
         self.SupervisorMap.wheelEvent = self.wheelEvent
         self.SupervisorMap.setScene(self.scene)
-        self.SupervisorMap.resize(1400, 1080)
-        self.SideMenu.move(1600, 0)
         self.loadMap(map)
         self.SideMenuShowing = False
         self.SetUpTable()
@@ -55,14 +58,14 @@ class SupervisorUI(QtWidgets.QMainWindow):
     def SideMenuThreadCallback(self, result):
         if(self.SideMenuShowing):
             self.CreateTaskButton.setText("Create Task")
-            self.SupervisorMap.resize(1200+(result+1)*10, 1080)
-            self.SideMenu.move(1400+(result+1)*10, 0)
+            self.SupervisorMap.resize((self.mapWidth-self.slideInMenuWidth)+(result+1)*self.slideInMenuWidth/self.numAnimationSteps, self.windowHeight)
+            self.SideMenu.move(self.windowWidth-self.slideInMenuWidth+(result+1)*self.slideInMenuWidth/self.numAnimationSteps, 0)
             if(result+1==20):
                 self.SideMenuShowing = False
         else:
             self.CreateTaskButton.setText("Cancel")
-            self.SupervisorMap.resize(1400 - (result + 1) * 10, 1080)
-            self.SideMenu.move(1600 - (result + 1) * 10, 0)
+            self.SupervisorMap.resize(self.mapWidth - (result + 1) * self.slideInMenuWidth/self.numAnimationSteps, self.windowHeight)
+            self.SideMenu.move(self.windowWidth - (result + 1) * self.slideInMenuWidth/self.numAnimationSteps, 0)
             if (result + 1 == 20):
                 self.SideMenuShowing = True
 
@@ -132,12 +135,25 @@ class SupervisorUI(QtWidgets.QMainWindow):
         desAspX = 16
         desAspY = 9
         if width/height>desAspX/desAspY:
-            windowHeight = height*0.75
-            windowWidth = windowHeight*desAspX/desAspY
+            self.windowHeight = int(height*0.9)
+            self.windowWidth = int(self.windowHeight*desAspX/desAspY)
         else:
-            windowWidth = width*0.75
-            windowHeight = windowWidth*desAspY/desAspX
-        self.setFixedSize(windowWidth, windowHeight)
+            self.windowWidth = int(width*0.9)
+            self.windowHeight = int(self.windowWidth*desAspY/desAspX)
+        self.setFixedSize(self.windowWidth, self.windowHeight)
+        self.slideInMenuWidth = self.windowWidth*0.2
+        robotListWidth = self.windowWidth*0.2
+        self.mapWidth = self.windowWidth*0.8
+        createTaskButtonWidth = self.windowWidth*0.12
+        createTaskButtonHeight = self.windowHeight*0.02
+        self.RobotListTable.resize(robotListWidth, self.windowHeight)
+        self.SupervisorMap.resize(self.mapWidth, self.windowHeight)
+        self.SupervisorMap.move(robotListWidth, 0)
+        self.CreateTaskButton.resize(createTaskButtonWidth, createTaskButtonHeight)
+        self.CreateTaskButton.move(self.windowWidth*0.96-createTaskButtonWidth, self.windowHeight*0.98-createTaskButtonHeight)
+        self.SideMenu.move(self.windowWidth, 0)
+        self.SideMenu.resize(self.slideInMenuWidth, self.windowHeight)
+
 
 class SideMenuThread(QThread):
     signal = pyqtSignal('PyQt_PyObject')
