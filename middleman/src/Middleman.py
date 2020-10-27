@@ -174,7 +174,7 @@ class Middleman():
         poseStamped = PoseStamped()
         poseStamped.pose.position.x = X
         poseStamped.pose.position.y = Y
-        poseStamped.header.frame_id = 'odom'
+        poseStamped.header.frame_id = 'map'
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.w = 1
         poseStamped.pose.orientation.z = .16
@@ -182,7 +182,7 @@ class Middleman():
         if currentRobot.name == 'trina2':
             topic = '/move_base_simple/goal'
         else:
-            topic = currentRobot.name+'/move_base_simple/goal'
+            topic = '/' + currentRobot.name+'/move_base_simple/goal'
         print(topic)
         goal_publisher = rospy.Publisher(topic, PoseStamped, queue_size=10)
         rospy.sleep(1)
@@ -260,7 +260,8 @@ class Middleman():
         pass
 
     def sendTaskCodesToSupervisor(self, req):
-        taskCodeStringList = ['Navigation (NAV)', 'Delivery (DLV)', 'Help (HLP)', 'Clean (CLN)']
+        taskCodeStringList = ['NAV Navigation True #75D858', 'DLV Delivery True #B27026', 'HLP Help True #FF1F00',
+                              'CLN Clean True #00A2FF']
         return TaskStringResponse(taskCodeStringList)
 
     def alertSupervisorRobotIsDone(self):
