@@ -177,6 +177,25 @@
       <string>Confirm Task</string>
      </property>
     </widget>
+    <widget class="QLabel" name="ErrorLBL">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>340</y>
+       <width>129</width>
+       <height>34</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color:red;</string>
+     </property>
+     <property name="text">
+      <string>Please Select a Location</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
    </widget>
    <widget class="QPushButton" name="CreateTaskButton">
     <property name="geometry">
