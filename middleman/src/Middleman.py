@@ -259,8 +259,9 @@ class Middleman():
         pass
 
     def sendTaskCodesToSupervisor(self, req):
-        taskCodeStringList = ['NAV Navigation True #75D858', 'DLV Delivery True #B27026', 'HLP Help True #FF1F00',
-                              'CLN Clean True #00A2FF', 'SOS Operator False #FFBB33', 'IDLE Idle True #9BA8AB']
+        # colors are Nav-green DLV-orange Help-red CLN-blue SOS-red IDL-grey
+        taskCodeStringList = ['IDLE Idle False #FFF700', 'NAV Navigation True #75D858', 'DLV Delivery True #B27026', 'HLP Help True #A600FF',
+                              'CLN Clean True #00A2FF', 'SOS Stuck False #FF0000', 'IDLE Idle True #9BA8AB']
         return TaskStringResponse(taskCodeStringList)
 
     def alertSupervisorRobotIsDone(self):

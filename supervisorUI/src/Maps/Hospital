@@ -1,0 +1,85 @@
+{
+  "objects": [
+    {
+      "name":"Wall 1","type": "rect", "centerX": -1200, "centerY": -150, "length": 1915, "width": 16, "rotation": 90
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": -600, "centerY": 8, "length": 600, "width": 16, "rotation": 0
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": -308, "centerY": 300, "length": 600, "width": 16, "rotation": 90
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": -400, "centerY": 592, "length": 200, "width": 16, "rotation": 0
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": -608, "centerY": 750, "length": 100, "width": 16, "rotation": 90
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": -750, "centerY": 792, "length": 300, "width": 16, "rotation": 0
+    },
+    {
+      "name":"Room 1","type": "rect", "centerX": -892, "centerY": 400, "length": 800, "width": 16, "rotation": 90
+    },
+    {
+      "text":"Room 1","type": "text", "centerX": -500, "centerY": 400, "length": 400, "width": 50, "rotation": 0
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": -600, "centerY": -308, "length": 600, "width": 16, "rotation": 0
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": -892, "centerY": -600, "length": 600, "width": 16, "rotation": 90
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": -800, "centerY": -892, "length": 200, "width": 16, "rotation": 0
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": -592, "centerY": -1050, "length": 100, "width": 16, "rotation": 90
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": -450, "centerY": -1092, "length": 300, "width": 16, "rotation": 0
+    },
+    {
+      "name":"Room 2","type": "rect", "centerX": -308, "centerY": -700, "length": 800, "width": 16, "rotation": 90
+    },
+    {
+      "text":"Room 2","type": "text", "centerX": -500, "centerY": -600, "length": 400, "width": 50, "rotation": 0
+    },
+    {
+      "name":"Long Right Wall","type": "rect", "centerX": 592, "centerY": -150, "length": 1900, "width": 16, "rotation": 90
+    },
+    {
+      "name":"Top Right Wall","type": "rect", "centerX": 300, "centerY": 792, "length": 600, "width": 16, "rotation": 0
+    },
+    {
+      "text":"Room 3","type": "text", "centerX": 400, "centerY": 400, "length": 400, "width": 50, "rotation": 0
+    },
+     {
+      "name":"Top-Mid Right Wall","type": "rect", "centerX": 300, "centerY": 0, "length": 600, "width": 16, "rotation": 0
+     },
+    {
+      "text":"Room 4","type": "text", "centerX": 400, "centerY": -300, "length": 400, "width": 50, "rotation": 0
+    },
+    {
+      "name":"Bottom-Mid Right Wall","type": "rect", "centerX": 300, "centerY": -550, "length": 600, "width": 16, "rotation": 0
+     },
+    {
+      "text":"Room 5","type": "text", "centerX": 400, "centerY": -800, "length": 400, "width": 50, "rotation": 0
+    },
+    {
+      "name":"Bottom Right Wall","type": "rect", "centerX": 300, "centerY": -1092, "length": 600, "width": 16, "rotation": 0
+     },
+    {
+      "name":"Top Right Door","type": "rect", "centerX": 8, "centerY": 500, "length": 600, "width": 16, "rotation": 90
+     },
+    {
+      "name":"Middle Right Door","type": "rect", "centerX": 8, "centerY": -163, "length": 475, "width": 16, "rotation": 90
+     },
+    {
+      "name":"Bottom Right Door","type": "rect", "centerX": 8, "centerY": -725, "length": 450, "width": 16, "rotation": 90
+     },
+    {
+      "name":"Last Sliver of Wall","type": "rect", "centerX": 8, "centerY": -1063, "length": 75, "width": 16, "rotation": 90
+     }
+  ]
+}
