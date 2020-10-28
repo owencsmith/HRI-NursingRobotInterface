@@ -198,6 +198,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             label.setDefaultTextColor(color)
             label.setFont(font)
             self.scene.addItem(label)
+            self.RobotShapes.append(label)
             #making the arrow
             line = QGraphicsLineItem(int(item.pose.pose.pose.position.x*100-math.cos(
                                          item.pose.pose.pose.orientation.z)*obSize/4),
