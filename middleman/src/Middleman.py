@@ -5,6 +5,7 @@ import rospy
 from std_msgs.msg import *
 from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from middleman.srv import TaskString, TaskStringResponse
 from Task import *
 
 
@@ -84,6 +85,9 @@ class Middleman():
         self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size = 10)
         rospy.sleep(1)
 
+        # servers
+        self.taskCodeServer = rospy.Service('/supervisor/taskCodes', TaskString, self.sendTaskCodesToSupervisor)
+
     #check data length >= 4
     # process task determines which queue to put the task in
     def processTask(self, data):
@@ -132,10 +136,15 @@ class Middleman():
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
         pass
 
-    #@TODO
+    #@TODO without autonomy work the same as nav task
     def dlvTask(self, taskMsg):
-        # print("Processing Delivery Task")
-        # # parses Robot name XY string and sends to robots movebase
+        print("Processing Delivery Task")
+        # parses Robot name XY string and sends to robots movebase
+        currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.currentTask = taskMsg
+        currentRobot.currentTaskName = taskMsg.taskName
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
+
         # data = task.variables.split()
         # toX = data[0]
         # toY = data[1]
@@ -165,7 +174,7 @@ class Middleman():
         poseStamped = PoseStamped()
         poseStamped.pose.position.x = X
         poseStamped.pose.position.y = Y
-        poseStamped.header.frame_id = 'odom'
+        poseStamped.header.frame_id = 'map'
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.w = 1
         poseStamped.pose.orientation.z = .16
@@ -173,7 +182,7 @@ class Middleman():
         if currentRobot.name == 'trina2':
             topic = '/move_base_simple/goal'
         else:
-            topic = currentRobot.name+'/move_base_simple/goal'
+            topic = '/' + currentRobot.name+'/move_base_simple/goal'
         print(topic)
         goal_publisher = rospy.Publisher(topic, PoseStamped, queue_size=10)
         rospy.sleep(1)
@@ -250,11 +259,10 @@ class Middleman():
             self.sendRobotToPos(str(robotThatWillHelp.name), robotToNavigateToX, robotToNavigateToY)
         pass
 
-    def guiCoordinatesToWorldCoordinates(self, coordinates):
-        pass
-
-    def worldCoordinatesToGuiCoordinates(self, coordinates):
-        pass
+    def sendTaskCodesToSupervisor(self, req):
+        taskCodeStringList = ['NAV Navigation True #75D858', 'DLV Delivery True #B27026', 'HLP Help True #FF1F00',
+                              'CLN Clean True #00A2FF']
+        return TaskStringResponse(taskCodeStringList)
 
     def alertSupervisorRobotIsDone(self):
         print("Robot has finished task. Going to IDLE")
