@@ -199,50 +199,35 @@ class SupervisorUI(QtWidgets.QMainWindow):
             label.setFont(font)
             self.scene.addItem(label)
             self.RobotShapes.append(label)
+            item.pose.pose.pose.orientation.z = item.pose.pose.pose.orientation.z+3.14/2
             #making the arrow
-            line = QGraphicsLineItem(int(item.pose.pose.pose.position.x*100-math.cos(
-                                         item.pose.pose.pose.orientation.z)*obSize/4),
-                                     -int(item.pose.pose.pose.position.y*100-math.sin(
-                                         item.pose.pose.pose.orientation.z)*obSize/4),
-                                     int(item.pose.pose.pose.position.x*100+math.cos(item.pose.pose.pose.orientation.z)*obSize/2-math.cos(
-                                         item.pose.pose.pose.orientation.z)*obSize/4),
-                                     -int(item.pose.pose.pose.position.y*100+math.sin(item.pose.pose.pose.orientation.z)*obSize/2-math.sin(
-                                         item.pose.pose.pose.orientation.z)*obSize/4))
+            startArrowX = int(item.pose.pose.pose.position.x*100-math.cos(
+                                         item.pose.pose.pose.orientation.z)*obSize/4)
+            startArrowY = -int(item.pose.pose.pose.position.y*100-math.sin(
+                                         item.pose.pose.pose.orientation.z)*obSize/4)
+            endArrowX =int(item.pose.pose.pose.position.x*100+math.cos(item.pose.pose.pose.orientation.z)*obSize/2-math.cos(
+                                         item.pose.pose.pose.orientation.z)*obSize/4)
+            endArrowY = -int(item.pose.pose.pose.position.y*100+math.sin(item.pose.pose.pose.orientation.z)*obSize/2-math.sin(
+                                         item.pose.pose.pose.orientation.z)*obSize/4)
+            line = QGraphicsLineItem(startArrowX,
+                                     startArrowY,
+                                     endArrowX,
+                                    endArrowY)
             line.setPen(QPen(self.black, 5))
             self.scene.addItem(line)
             self.RobotShapes.append(line)
-            line = QGraphicsLineItem(int(item.pose.pose.pose.position.x * 100 + math.cos(
-                                         item.pose.pose.pose.orientation.z) * obSize / 2-math.cos(
-                                         item.pose.pose.pose.orientation.z)*obSize/4),
-                                     -int(item.pose.pose.pose.position.y * 100 + math.sin(
-                                         item.pose.pose.pose.orientation.z) * obSize / 2-math.sin(
-                                         item.pose.pose.pose.orientation.z)*obSize/4),
-                                     int(item.pose.pose.pose.position.x * 100 + math.cos(
-                                         item.pose.pose.pose.orientation.z) * obSize / 2 - math.cos(
-                                         item.pose.pose.pose.orientation.z) * obSize / 4)
-                                        -math.cos(3.14/4+item.pose.pose.pose.orientation.z)*obSize/4,
-                                     -int(item.pose.pose.pose.position.y * 100 + math.sin(
-                                         item.pose.pose.pose.orientation.z) * obSize / 2
-                                        -math.sin(item.pose.pose.pose.orientation.z)*obSize/4)
-                                     +math.sin(3.14/4+item.pose.pose.pose.orientation.z)*obSize/4)
+            line = QGraphicsLineItem(endArrowX,
+                                    endArrowY,
+                                     endArrowX-math.cos(3.14/4+item.pose.pose.pose.orientation.z)*obSize/4,
+                                     endArrowY+math.sin(3.14/4+item.pose.pose.pose.orientation.z)*obSize/4)
 
             line.setPen(QPen(self.black, 5))
             self.scene.addItem(line)
             self.RobotShapes.append(line)
-            line = QGraphicsLineItem(int(item.pose.pose.pose.position.x * 100 + math.cos(
-                                        item.pose.pose.pose.orientation.z) * obSize / 2-math.cos(
-                                         item.pose.pose.pose.orientation.z)*obSize/4),
-                                     -int(item.pose.pose.pose.position.y * 100 + math.sin(
-                                         item.pose.pose.pose.orientation.z) * obSize / 2-math.sin(
-                                         item.pose.pose.pose.orientation.z)*obSize/4),
-                                     int(item.pose.pose.pose.position.x * 100 + math.cos(
-                                         item.pose.pose.pose.orientation.z) * obSize / 2 - math.cos(
-                                         item.pose.pose.pose.orientation.z) * obSize / 4
-                                     - math.cos(3.14 / 4 - item.pose.pose.pose.orientation.z) * obSize / 4),
-                                     -int(item.pose.pose.pose.position.y * 100 + math.sin(
-                                         item.pose.pose.pose.orientation.z) * obSize / 2
-                                          - math.sin(item.pose.pose.pose.orientation.z) * obSize / 4)
-                                     - math.sin(3.14 / 4 - item.pose.pose.pose.orientation.z) * obSize / 4)
+            line = QGraphicsLineItem(endArrowX,
+                                    endArrowY,
+                                     endArrowX- math.cos(3.14 / 4 - item.pose.pose.pose.orientation.z) * obSize / 4,
+                                     endArrowY- math.sin(3.14 / 4 - item.pose.pose.pose.orientation.z) * obSize / 4)
 
             line.setPen(QPen(self.black, 5))
             self.scene.addItem(line)
