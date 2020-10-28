@@ -65,7 +65,6 @@ class Middleman():
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
         rospy.Subscriber("/supervisor/task", String, self.processTask)
-        rospy.Subscriber("/supervisor/sos", String, self.passRobotToQueueForOperator)
         rospy.Subscriber("/operator/done_helping", String, self.advanceRobotHelpQueue)
         rospy.Subscriber("/operator/request_extra_views_from_robot", String, self.sendAnotherRobotForCameraViews)
         rospy.Subscriber("/robot/stuck", String, self.passRobotToQueueForOperator)
@@ -99,24 +98,26 @@ class Middleman():
         taskName = dataList[0]
         # passed as unassigned if task is not assigned
         robotName = dataList[1]
-        X = float(dataList[2])
-        Y = float(dataList[3])
         print('Split Task Data')
 
         if len(dataList) > 4:
             variables = dataList[4:]
         else:
             variables = None
-
-        newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, variables)
-        newTaskMsg = newTask.convertTaskToTaskMsg()
-        if robotName != "unassigned":
-            self.taskFns[taskName](newTaskMsg)
-            self.activeTaskList.append(newTask)
-        else:
-            self.taskPriorityQueue.append(newTask)
-            self.taskPriorityQueue.sort(key=lambda task: task.getPriority())
-        print('Called Task Function')
+        if(taskName != 'SOS'):
+            X = float(dataList[2])
+            Y = float(dataList[3])
+            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, variables)
+            newTaskMsg = newTask.convertTaskToTaskMsg()
+            if robotName != "unassigned":
+                self.taskFns[taskName](newTaskMsg)
+                self.activeTaskList.append(newTask)
+            else:
+                self.taskPriorityQueue.append(newTask)
+                self.taskPriorityQueue.sort(key=lambda task: task.getPriority())
+            print('Called Task Function')
+        elif(taskName == 'SOS'):
+            self.passRobotToQueueForOperator(robotName)
 
     def navTask(self, taskMsg):
         print("Processing Nav Goal")
@@ -184,17 +185,15 @@ class Middleman():
         else:
             topic = '/' + currentRobot.name+'/move_base_simple/goal'
         print(topic)
-        goal_publisher = rospy.Publisher(topic, PoseStamped, queue_size=10)
-        rospy.sleep(1)
-        goal_publisher.publish(poseStamped)
+        self.goal_publisher = rospy.Publisher(topic, PoseStamped, queue_size=10)
+        rospy.sleep(2)
+        self.goal_publisher.publish(poseStamped)
         print('Publishing Nav Goal')
 
     # When sos message is published
     # Add to queue, sort
-    def passRobotToQueueForOperator(self, data):
-        # get robot name
-        robotName = data.data.split()[0]
-        print("Passing robot: ", robotName)
+    def passRobotToQueueForOperator(self, robotName):
+        print("Passing robot: ", robotName, " to operator")
         # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
         # change status to OPC
@@ -261,7 +260,7 @@ class Middleman():
 
     def sendTaskCodesToSupervisor(self, req):
         taskCodeStringList = ['NAV Navigation True #75D858', 'DLV Delivery True #B27026', 'HLP Help True #FF1F00',
-                              'CLN Clean True #00A2FF']
+                              'CLN Clean True #00A2FF', 'SOS Operator False #FFBB33', 'IDLE Idle True #9BA8AB']
         return TaskStringResponse(taskCodeStringList)
 
     def alertSupervisorRobotIsDone(self):
