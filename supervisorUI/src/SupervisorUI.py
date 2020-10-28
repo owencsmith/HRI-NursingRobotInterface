@@ -2,7 +2,7 @@
 import rospy
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
-    QGraphicsView, QHeaderView, QTableWidgetItem, QListView
+    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint, QPointF
@@ -10,9 +10,11 @@ from PyQt5.QtCore import Qt, QLineF, QRectF
 import sys
 import json
 import time
+import math
 from std_msgs.msg import *
 from supervisorUI.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from supervisorUI.srv import TaskString, TaskStringResponse
 designerFile = "SupervisorUI.ui" #TODO make this visible inside rosrun
 map = "Maps/Hospital" #TODO make this visible inside rosrun
 
@@ -32,13 +34,14 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.LocationTargetShapes = []
         self.RobotNames = []
         self.RobotTasks = {}
+        self.RobotTasksToCode = {}
         self.robotUpdateSignal.connect(self.drawRobotCallback)
         self.robotTaskChangeSignal.connect(self.taskChangeMainThreadCallback)
         self.stateSubscriber = rospy.Subscriber('/supervisor/robotState', RobotArr, self.robotStateCallback)
         self.taskChangeSubscriber = rospy.Subscriber('/supervisor/taskReassignment', TaskMsgArr, self.taskChangeCallback)
         self.taskPublisher = rospy.Publisher("/supervisor/task", String, queue_size=10)
-        self.AsyncFunctionsThread = AsyncFunctionsThread(self)
-        self.AsyncFunctionsThread.signal.connect(self.AsyncFunctionsThreadCallback)
+        rospy.wait_for_service('/supervisor/taskCodes')
+        self.fillRobotTasks()
         self.SideMenuThread = SideMenuThread()
         self.SideMenuThread.signal.connect(self.SideMenuThreadCallback)
         self.pickLocation = False
@@ -48,8 +51,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SelectLocationBTN.clicked.connect(self.SelectLocationCallback)
         self.ConfirmTask.clicked.connect(self.confirmTaskCreationCallback)
         self.TaskSwitchOKBTN.clicked.connect(self.okBTNCallback)
+        self.SelectTaskCB.activated.connect(self.taskComboBoxChanged)
         #subscriber for reciecing robot locations on the map
-        graphicsSize = self.SupervisorMap.size()
+        #graphicsSize = self.SupervisorMap.size()
         self.black = QColor(qRgb(0, 0, 0))
         self.blue = QColor(qRgb(30, 144, 255))
         self.red = QColor(qRgb(220, 20, 60))
@@ -72,7 +76,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
     def ToggleSideMenu(self):
         if not self.SideMenuShowing:
+            self.ErrorLBL.hide()
             self.populateTaskComboBox()
+            self.taskComboBoxChanged()
             self.SelectRobot.clear()
             self.SelectRobot.addItem("unassigned")
             for item in self.RobotNames:
@@ -85,9 +91,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 for item in self.LocationTargetShapes:
                     self.scene.removeItem(item)
         self.SideMenuThread.start()
-
-    def AsyncFunctionsThreadCallback(self, result):
-        pass
 
     def SideMenuThreadCallback(self, result):
         if(self.SideMenuShowing):
@@ -181,7 +184,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
             obSize = 100
             shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
-            shape.setBrush(QBrush(self.blue, Qt.SolidPattern))
+            color = QColor(self.RobotTasks[item.currentTaskName][2])
+            shape.setBrush(QBrush(color, Qt.SolidPattern))
             self.scene.addItem(shape)
             self.RobotShapes.append(shape)
             self.RobotNames.append(item.name)
@@ -191,31 +195,73 @@ class SupervisorUI(QtWidgets.QMainWindow):
             font = QFont("Bavaria")
             font.setPointSize(18)
             font.setWeight(QFont.Bold)
-            label.setDefaultTextColor(self.blue)
+            label.setDefaultTextColor(color)
             label.setFont(font)
             self.scene.addItem(label)
+            #making the arrow
+            line = QGraphicsLineItem(int(item.pose.pose.pose.position.x*100-math.cos(
+                                         item.pose.pose.pose.orientation.z)*obSize/4),
+                                     -int(item.pose.pose.pose.position.y*100-math.sin(
+                                         item.pose.pose.pose.orientation.z)*obSize/4),
+                                     int(item.pose.pose.pose.position.x*100+math.cos(item.pose.pose.pose.orientation.z)*obSize/2-math.cos(
+                                         item.pose.pose.pose.orientation.z)*obSize/4),
+                                     -int(item.pose.pose.pose.position.y*100+math.sin(item.pose.pose.pose.orientation.z)*obSize/2-math.sin(
+                                         item.pose.pose.pose.orientation.z)*obSize/4))
+            line.setPen(QPen(self.black, 5))
+            self.scene.addItem(line)
+            self.RobotShapes.append(line)
+            line = QGraphicsLineItem(int(item.pose.pose.pose.position.x * 100 + math.cos(
+                                         item.pose.pose.pose.orientation.z) * obSize / 2-math.cos(
+                                         item.pose.pose.pose.orientation.z)*obSize/4),
+                                     -int(item.pose.pose.pose.position.y * 100 + math.sin(
+                                         item.pose.pose.pose.orientation.z) * obSize / 2-math.sin(
+                                         item.pose.pose.pose.orientation.z)*obSize/4),
+                                     int(item.pose.pose.pose.position.x * 100 + math.cos(
+                                         item.pose.pose.pose.orientation.z) * obSize / 2 - math.cos(
+                                         item.pose.pose.pose.orientation.z) * obSize / 4)
+                                        -math.cos(3.14/4+item.pose.pose.pose.orientation.z)*obSize/4,
+                                     -int(item.pose.pose.pose.position.y * 100 + math.sin(
+                                         item.pose.pose.pose.orientation.z) * obSize / 2
+                                        -math.sin(item.pose.pose.pose.orientation.z)*obSize/4)
+                                     +math.sin(3.14/4+item.pose.pose.pose.orientation.z)*obSize/4)
+
+            line.setPen(QPen(self.black, 5))
+            self.scene.addItem(line)
+            self.RobotShapes.append(line)
+            line = QGraphicsLineItem(int(item.pose.pose.pose.position.x * 100 + math.cos(
+                                        item.pose.pose.pose.orientation.z) * obSize / 2-math.cos(
+                                         item.pose.pose.pose.orientation.z)*obSize/4),
+                                     -int(item.pose.pose.pose.position.y * 100 + math.sin(
+                                         item.pose.pose.pose.orientation.z) * obSize / 2-math.sin(
+                                         item.pose.pose.pose.orientation.z)*obSize/4),
+                                     int(item.pose.pose.pose.position.x * 100 + math.cos(
+                                         item.pose.pose.pose.orientation.z) * obSize / 2 - math.cos(
+                                         item.pose.pose.pose.orientation.z) * obSize / 4
+                                     - math.cos(3.14 / 4 - item.pose.pose.pose.orientation.z) * obSize / 4),
+                                     -int(item.pose.pose.pose.position.y * 100 + math.sin(
+                                         item.pose.pose.pose.orientation.z) * obSize / 2
+                                          - math.sin(item.pose.pose.pose.orientation.z) * obSize / 4)
+                                     - math.sin(3.14 / 4 - item.pose.pose.pose.orientation.z) * obSize / 4)
+
+            line.setPen(QPen(self.black, 5))
+            self.scene.addItem(line)
+            self.RobotShapes.append(line)
+
+    def fillRobotTasks(self):
+        self.RobotTasks = {}
+        self.RobotTasksToCode = {}
+        getTasksFromMiddleMan = rospy.ServiceProxy('/supervisor/taskCodes', TaskString)
+        response = getTasksFromMiddleMan("YOOOOO")
+        for item in response.tasks:
+            taskInfo = item.split()
+            self.RobotTasks[taskInfo[0]] = (taskInfo[1], taskInfo[2], taskInfo[3])
+            self.RobotTasksToCode[taskInfo[1]] = taskInfo[0]
 
     def populateTaskComboBox(self):
         #will eventually use service request for tasks
-        self.RobotTasks = {}
-        """
-           Task codes:
-               NAV: Robot is navigating 
-               HLP: Robot Operator is asking for another robot for additional camera views
-               CLN: Robot is asked to clean
-               DLV: Robot is asked to deliver something 
-               IDLE: Robot has no current task
-               SOS: Supervisor passes control of the robot to the operator
-           """
-        self.RobotTasks["Idle"] = "IDLE"
-        self.RobotTasks["Navigating"] = "NAV"
-        self.RobotTasks["Additional Camera"] = "HLP"
-        self.RobotTasks["Clean"] = "CLN"
-        self.RobotTasks["Deliver"] = "DLV"
-        self.RobotTasks["Needs Help"] = "SOS"
         self.SelectTaskCB.clear()
         for key in self.RobotTasks.keys():
-            self.SelectTaskCB.addItem(key)
+            self.SelectTaskCB.addItem(self.RobotTasks[key][0])
 
     def SelectLocationCallback(self):
         self.SelectLocationBTN.setEnabled(False)
@@ -262,8 +308,17 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
     def confirmTaskCreationCallback(self):
         #Task Strings: 'task_name robot_name X Y [vars ...]'
-        self.taskPublisher.publish(self.RobotTasks[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " + str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]))
-        self.ToggleSideMenu()
+        if self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]][1]=="True":
+            if not self.LocationPicked:
+                self.ErrorLBL.show()
+            else:
+                self.taskPublisher.publish(self.RobotTasksToCode[
+                                               self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
+                    self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]))
+                self.ToggleSideMenu()
+        else:
+            self.taskPublisher.publish(self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " + str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]))
+            self.ToggleSideMenu()
 
     def taskChangeCallback(self, message):
         self.robotTaskChangeSignal.emit(message)
@@ -277,6 +332,20 @@ class SupervisorUI(QtWidgets.QMainWindow):
     def okBTNCallback(self):
         self.TaskSwitchList.clear()
         self.TaskSwitchFrame.hide()
+
+    def taskComboBoxChanged(self):
+        #print("Combo changed")
+        self.ErrorLBL.hide()
+        for item in self.LocationTargetShapes:
+            self.scene.removeItem(item)
+        if(self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]][1]=="True"):
+            self.SelectLocationBTN.setEnabled(True)
+        else:
+            self.SelectLocationBTN.setEnabled(False)
+            self.LocationCoordinates = (0, 0)
+            self.XLocLabel.setText("X: ")
+            self.YLocLabel.setText("Y: ")
+            self.LocationPicked = False
 
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
@@ -325,6 +394,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.ConfirmTask.move(self.slideInMenuWidth*0.05, self.windowHeight*0.24)
         self.ConfirmTask.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.04)
 
+        self.ErrorLBL.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.02)
+        self.ErrorLBL.move(self.slideInMenuWidth*0.05, self.windowHeight*0.28)
+
         self.TaskSwitchFrame.hide()
         TaskFrameWidth = self.windowWidth*0.6
         TaskFrameHeight = self.windowHeight*0.1
@@ -347,18 +419,6 @@ class SideMenuThread(QThread):
         for x in range(0, self.numSteps):
             time.sleep(self.numSec/self.numSteps)
             self.signal.emit(x)
-
-class AsyncFunctionsThread(QThread):
-    signal = pyqtSignal('PyQt_PyObject')
-    def __init__(self, gui):
-        QThread.__init__(self)
-        self.gui = gui
-
-    def run(self):
-        #does something
-
-        #errors occurs, signal main app
-        self.signal.emit("Error")
 
 if __name__ == '__main__':
     rospy.init_node('SupervisorUI')
