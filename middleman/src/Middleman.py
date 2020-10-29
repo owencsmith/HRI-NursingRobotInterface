@@ -164,11 +164,13 @@ class Middleman():
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
-        pass
 
     #do nothing
     def idleTask(self, taskMsg):
-       pass
+        currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.currentTask = taskMsg
+        currentRobot.currentTaskName = taskMsg.taskName
+        self.sendRobotToPos(currentRobot, float(currentRobot.pose.pose.pose.position.x), float(currentRobot.pose.pose.pose.position.y))
 
     def sendRobotToPos(self, currentRobot, X, Y):
         # publish coordinates to move_base of specific robot
@@ -197,7 +199,10 @@ class Middleman():
         # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
         # change status to OPC
-        # task code doesn't change so that the operator knows whats up
+        # task code doesn't change so that the operator knows whats
+        # SOS needs to change because the GUI checks currentTaskName for color and other information
+        # the task the robot was doing doesn't change in the taskMsg so the operator knows what the robot was doing.
+        robotThatNeedsHelp.currentTaskName = "SOS"
         robotThatNeedsHelp.status = "OPC"
         self.robotsForOperator.append(robotThatNeedsHelp)
         self.robotsForOperator.sort(key=lambda robot: robot.currentTask.taskPriority)
@@ -359,33 +364,33 @@ class Middleman():
         fiveMinutes = 60
         if time.time() - self.reassignmentCounter > fiveMinutes and len(self.taskPriorityQueue) > 0:
             print("Time's Up")
-            highestPriorityTask = self.taskPriorityQueue[-1]
-            for activeTask in self.activeTaskList:
-                if highestPriorityTask.getPriority() > activeTask.getPriority():
+            if(len(self.taskPriorityQueue) > 0 and len(self.activeTaskList) > 0):
+                highestPriorityTask = self.taskPriorityQueue[-1]
+                self.activeTaskList.sort(key=lambda task: task.getPriority())
+                lowestPriorityTask = self.activeTaskList[0]
+                if highestPriorityTask.getPriority() > lowestPriorityTask.getPriority():
                     print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(highestPriorityTask.getPriority()))
                     swappedTasks = TaskMsgArr()
                     # swap the active task with high  [Active, High Priority]
-                    # TODO: @NICK make a popup that the supervisor sees to know this happened
-                    swappedTasks.taskMsgs.append(activeTask.convertTaskToTaskMsg())
+                    swappedTasks.taskMsgs.append(lowestPriorityTask.convertTaskToTaskMsg())
                     swappedTasks.taskMsgs.append(highestPriorityTask.convertTaskToTaskMsg())
                     self.taskReassignmentPublisher.publish(swappedTasks)
                     #remove from priority queue
                     self.taskPriorityQueue.pop()
                     #reassign robot name
-                    highestPriorityTask.robotName = activeTask.robotName
+                    highestPriorityTask.robotName = lowestPriorityTask.robotName
                     #add new task to active
                     self.activeTaskList.append(highestPriorityTask)
                     #remove now inactive from activeList
-                    self.activeTaskList.remove(activeTask)
-                    robotBeingReassigned = self.activeRobotDictionary[activeTask.robotName]
+                    self.activeTaskList.remove(lowestPriorityTask)
+                    robotBeingReassigned = self.activeRobotDictionary[lowestPriorityTask.robotName]
                     robotBeingReassigned.currentTask = highestPriorityTask.convertTaskToTaskMsg()
                     robotBeingReassigned.currentTaskName = highestPriorityTask.taskName
                     #reassign active task to unassigned status
-                    activeTask.robotName = 'unassigned'
+                    lowestPriorityTask.robotName = 'unassigned'
                     #add previously active task to priority queue
-                    self.taskPriorityQueue.append(activeTask)
+                    self.taskPriorityQueue.append(lowestPriorityTask)
                     self.reassignmentCounter = time.time()
-                    return
             self.reassignmentCounter = time.time()
 
 

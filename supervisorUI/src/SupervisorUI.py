@@ -15,8 +15,8 @@ from std_msgs.msg import *
 from supervisorUI.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from supervisorUI.srv import TaskString, TaskStringResponse
-designerFile = "SupervisorUI.ui" #TODO make this visible inside rosrun
-map = "Maps/Hospital" #TODO make this visible inside rosrun
+designerFile = "/home/gabe/catkin_ws/src/HRI-NursingRobotInterface/supervisorUI/src/SupervisorUI.ui" #TODO make this visible inside rosrun
+map = "/home/gabe/catkin_ws/src/HRI-NursingRobotInterface/supervisorUI/src/Maps/Hospital" #TODO make this visible inside rosrun
 
 class SupervisorUI(QtWidgets.QMainWindow):
     robotUpdateSignal = pyqtSignal('PyQt_PyObject')
@@ -311,7 +311,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
     def taskChangeMainThreadCallback(self, result):
         changes = result.taskMsgs
-        messageString = changes[0].robotName + " Reassigned to "+changes[1].taskName +" " + changes[1].ID+". Previous task was "+changes[0].taskName+" " + changes[1].ID
+        messageString = changes[0].robotName + " Reassigned to "+changes[1].taskName +" " + changes[1].ID+". Previous task was "+changes[0].taskName+" " + changes[0].ID
         self.TaskSwitchList.addItem(messageString)
         self.TaskSwitchFrame.show()
 
