@@ -15,11 +15,12 @@ from std_msgs.msg import *
 from supervisorUI.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from supervisorUI.srv import TaskString, TaskStringResponse
-designerFile = "/home/gabe/catkin_ws/src/HRI-NursingRobotInterface/supervisorUI/src/SupervisorUI.ui" #TODO make this visible inside rosrun
-map = "/home/gabe/catkin_ws/src/HRI-NursingRobotInterface/supervisorUI/src/Maps/Hospital" #TODO make this visible inside rosrun
+designerFile = "SupervisorUI.ui" #TODO make this visible inside rosrun
+map = "Maps/Hospital" #TODO make this visible inside rosrun
 
 class SupervisorUI(QtWidgets.QMainWindow):
     robotUpdateSignal = pyqtSignal('PyQt_PyObject')
+    taskUpdateSignal = pyqtSignal('PyQt_PyObject')
     robotTaskChangeSignal = pyqtSignal('PyQt_PyObject')
     def __init__(self, width, height):
         super(SupervisorUI, self).__init__()
@@ -37,7 +38,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.RobotTasksToCode = {}
         self.robotUpdateSignal.connect(self.drawRobotCallback)
         self.robotTaskChangeSignal.connect(self.taskChangeMainThreadCallback)
+        self.taskUpdateSignal.connect(self.taskListCallback)
         self.stateSubscriber = rospy.Subscriber('/supervisor/robotState', RobotArr, self.robotStateCallback)
+        self.taskSubscriber = rospy.Subscriber('/supervisor/taskList', TaskMsgArr, self.taskListRosCallback)
         self.taskChangeSubscriber = rospy.Subscriber('/supervisor/taskReassignment', TaskMsgArr, self.taskChangeCallback)
         self.taskPublisher = rospy.Publisher("/supervisor/task", String, queue_size=10)
         rospy.wait_for_service('/supervisor/taskCodes')
@@ -111,18 +114,25 @@ class SupervisorUI(QtWidgets.QMainWindow):
             pass
 
     def SetUpTable(self):
-        self.RobotListTable.setColumnCount(2)
-        self.RobotListTable.setHorizontalHeaderLabels(('Robot ID', 'Task'))
-        self.RobotListTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.RobotListTable.setColumnCount(3)
+        self.RobotListTable.setHorizontalHeaderLabels(('Robot ID', 'Task', 'Status'))
+        self.RobotListTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+
+        self.PriorityQueueTable.setColumnCount(3)
+        self.PriorityQueueTable.setHorizontalHeaderLabels(('Task', 'ID', 'Priority'))
+        self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+
 
     def loadMap(self, mapLocation):
         #These shapes just help make the viewport more centered since it autocenters around the bounding box of the map objects
-        shape0 = QGraphicsRectItem(-1500, -1000, 1, 1)
-        shape0.setPen(self.white)
-        self.scene.addItem(shape0)
-        shape1 = QGraphicsRectItem(1500, 1500, 1, 1)
-        shape1.setPen(self.white)
-        self.scene.addItem(shape1)
+        #shape0 = QGraphicsRectItem(-1500, -1000, 1, 1)
+        #shape0.setPen(self.white)
+        #self.scene.addItem(shape0)
+        #shape1 = QGraphicsRectItem(1500, 1500, 1, 1)
+        #shape1.setPen(self.white)
+        #self.scene.addItem(shape1)
         #########################################################
         with open(mapLocation) as file:
             mapObjList = json.load(file)
@@ -181,6 +191,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.RobotListTable.insertRow(self.RobotListTable.rowCount())
             self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 0, QTableWidgetItem(item.name))
             self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 1, QTableWidgetItem(item.currentTaskName))
+            self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 2, QTableWidgetItem(item.status))
             obSize = 100
             shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
@@ -232,6 +243,18 @@ class SupervisorUI(QtWidgets.QMainWindow):
             line.setPen(QPen(self.black, 5))
             self.scene.addItem(line)
             self.RobotShapes.append(line)
+
+    def taskListRosCallback(self, message):
+        self.taskUpdateSignal.emit(message)
+
+    def taskListCallback(self, result):
+        self.PriorityQueueTable.setRowCount(0)  # clear table
+        for item in result.taskMsgs:
+            if item.robotName == "unassigned":
+                self.PriorityQueueTable.insertRow(self.PriorityQueueTable.rowCount())
+                self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 0, QTableWidgetItem(item.taskName))
+                self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 1, QTableWidgetItem(item.ID))
+                self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 2, QTableWidgetItem("{:.2f}".format(item.taskPriority)))
 
     def fillRobotTasks(self):
         self.RobotTasks = {}
@@ -350,7 +373,11 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.mapWidth = self.windowWidth*0.8
         createTaskButtonWidth = self.windowWidth*0.12
         createTaskButtonHeight = self.windowHeight*0.02
-        self.RobotListTable.resize(robotListWidth, self.windowHeight)
+        self.RobotListTable.resize(robotListWidth, self.windowHeight*0.7)
+        self.priorityQueueLBL.move(0,self.windowHeight*0.7)
+        self.priorityQueueLBL.resize(robotListWidth, self.windowHeight * 0.02)
+        self.PriorityQueueTable.move(0,self.windowHeight*0.72)
+        self.PriorityQueueTable.resize(robotListWidth, self.windowHeight * 0.28)
         self.SupervisorMap.resize(self.mapWidth, self.windowHeight)
         self.SupervisorMap.move(robotListWidth, 0)
         self.CreateTaskButton.resize(createTaskButtonWidth, createTaskButtonHeight)

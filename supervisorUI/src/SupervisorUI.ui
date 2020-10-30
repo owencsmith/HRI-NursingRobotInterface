@@ -30,7 +30,7 @@
       <x>0</x>
       <y>0</y>
       <width>200</width>
-      <height>1080</height>
+      <height>761</height>
      </rect>
     </property>
    </widget>
@@ -279,11 +279,39 @@ border-color: rgb(238, 238, 236);</string>
      </property>
     </widget>
    </widget>
+   <widget class="QLabel" name="priorityQueueLBL">
+    <property name="geometry">
+     <rect>
+      <x>60</x>
+      <y>770</y>
+      <width>129</width>
+      <height>34</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Unassigned Tasks</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QTableWidget" name="PriorityQueueTable">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>810</y>
+      <width>181</width>
+      <height>261</height>
+     </rect>
+    </property>
+   </widget>
    <zorder>SideMenu</zorder>
    <zorder>SupervisorMap</zorder>
    <zorder>RobotListTable</zorder>
    <zorder>CreateTaskButton</zorder>
    <zorder>TaskSwitchFrame</zorder>
+   <zorder>priorityQueueLBL</zorder>
+   <zorder>PriorityQueueTable</zorder>
   </widget>
  </widget>
  <resources/>
