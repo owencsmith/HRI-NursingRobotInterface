@@ -88,6 +88,15 @@ class Middleman():
     # check data length >= 4
     # process task determines which queue to put the task in
     def processTask(self, data):
+        """
+        This function determines which task is being asked to run on the robot
+        and calls the apprropriate task function. It also adds the task to the
+        active task list if a robot is assigned, or a priority queue if no robot
+        is assigned. Please look at the task code data structure above to see what that task codes mean. 
+        :param data: the string containing the robot and task information.
+                     i.e. <task name> <robot name> <X coordinate> <Y coordinate>
+        :return None
+        """
         # Have to know if the task has been unnassigned
         # have to know what the task is
         # Task Strings: 'task_name robot_name X Y [vars ...]'
@@ -124,6 +133,12 @@ class Middleman():
             self.passRobotToQueueForOperator(robotName)
 
     def navTask(self, taskMsg):
+        """
+        Performs a navigation task. Sets the robots task to NAV and commands it to a specified
+        position.
+        :param taskMsg: A taskMsg ROS message. Contains X and Y information as well as task code.
+        :return:  none
+        """
         print("Processing Nav Goal")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
@@ -133,6 +148,12 @@ class Middleman():
         pass
 
     def clnTask(self, taskMsg):
+        """
+         Sets the robots task to CLN and commands it to a specified location. Since no robot autonomy has yet been
+         implemented, this function can only navigate to the goal. Future work can implement the autonomy.
+         :param taskMsg: A taskMsg ROS message. Contains X and Y information as well as task code.
+         :return:  none
+         """
         print("Processing Cleaning Task")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
@@ -143,6 +164,12 @@ class Middleman():
 
     # @TODO without autonomy work the same as nav task
     def dlvTask(self, taskMsg):
+        """
+         Sets the robots task to DLV and commands it to a specified location. Since no robot autonomy has yet been
+         implemented, this function can only navigate to the goal. Future work can implement the autonomy.
+         :param taskMsg: A taskMsg ROS message. Contains X and Y information as well as task code.
+         :return:  none
+         """
         print("Processing Delivery Task")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
@@ -162,6 +189,12 @@ class Middleman():
         pass
 
     def hlpTask(self, taskMsg):
+        """
+         Sets the robots task to HLP and commands it to a specified location. Since no robot autonomy has yet been
+         implemented, this function can only navigate to the goal. Future work can implement the autonomy.
+         :param taskMsg: A taskMsg ROS message. Contains X and Y information as well as task code.
+         :return:  none
+         """
         print("Processing Help Task")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
@@ -171,6 +204,12 @@ class Middleman():
 
     # do nothing
     def idleTask(self, taskMsg):
+        """
+         Sets the robots task to IDLE and commands it to a specified location. The robot will stop and wait for a
+         different task.
+         :param taskMsg: A taskMsg ROS message.
+         :return:  none
+         """
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
