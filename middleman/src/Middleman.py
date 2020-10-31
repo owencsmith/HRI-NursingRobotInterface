@@ -217,6 +217,13 @@ class Middleman():
                             float(currentRobot.pose.pose.pose.position.y))
 
     def sendRobotToPos(self, currentRobot, X, Y):
+        """
+        Given a robot and a location, sends the robot to that location by publishing to
+        'robot_namespace'/move_base_simple/goal
+        :param currentRobot: The robot to move
+        :param X: the x location on the map
+        :param Y: the y location on the map
+        """
         # publish coordinates to move_base of specific robot
         poseStamped = PoseStamped()
         poseStamped.pose.position.x = X
@@ -236,9 +243,12 @@ class Middleman():
         self.goal_publisher.publish(poseStamped)
         print('Publishing Nav Goal')
 
-    # When sos message is published
-    # Add to queue, sort
     def passRobotToQueueForOperator(self, robotName):
+        """
+        This is a callback for the SOS message from the supervisor. Adds a robot in trouble to the operator queue and
+        sorts them by priority.
+        :param robotName: the robot that needs help
+        """
         print("Passing robot: ", robotName, " to operator")
         # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
@@ -259,8 +269,12 @@ class Middleman():
             self.sendNewRobotToOperator.publish(robotToHelp)
             self.operatorIsBusy = True
 
-    # Operator wants next robot, if available
     def advanceRobotHelpQueue(self, data):
+        """
+        When an operator finishes with a robot, if there is another robot in need of assistance load it into the
+        operator GUI
+        :param data: the robot name that was previously being helped by the operator
+        """
         self.operatorIsBusy = False
 
         # parse robot name
@@ -281,6 +295,11 @@ class Middleman():
 
     # TODO: add help task to the priority queue or active queue
     def sendAnotherRobotForCameraViews(self, data):
+        """
+        Part of the help task. Called when the operator requests another camera view (provided by head camera of
+        additional robot
+        :param data: robot name of the robot that is being helped by the operator
+        """
         print("Requesting another robot for camera views")
         robotAvailableForHelp = False
         robotThatWillHelp = None
@@ -308,13 +327,23 @@ class Middleman():
         pass
 
     def sendTaskCodesToSupervisor(self, req):
+        """
+        A boot message that provides color display infor and task type to the supervisor UI
+        :param req:
+        :return:
+        """
         # colors are IDL-grey Nav-green DLV-orange Help-red CLN-blue SOS-red
         taskCodeStringList = ['IDLE Idle False #9BA8AB', 'NAV Navigation True #75D858', 'DLV Delivery True #B27026',
                               'HLP Help True #A600FF',
                               'CLN Clean True #00A2FF', 'SOS Stuck False #FF0000']
         return TaskStringResponse(taskCodeStringList)
 
+    # TODO: What does this do??
     def alertSupervisorRobotIsDone(self):
+        """
+        THIS DOES NOTHING I THINK
+        :return:
+        """
         print("Robot has finished task. Going to IDLE")
         # find robot in dicionary
         # change robot task to IDLE
@@ -325,6 +354,12 @@ class Middleman():
     # The message that triggers this callback function should give all the unique information about the robot
     # It should have the unique move base and amcl topics
     def createNewRobot(self, data):
+        """
+        When a robot sends a boot message. Builds a robot message type and adds it to the robots tracked by the
+         middleman
+        :param data: the robot name
+        :return:
+        """
         print("Registering new robot. Robot name: " + str(data.data))
         newRobot = Robot()
         newRobot.name = data.data
@@ -365,6 +400,10 @@ class Middleman():
     # call the methods below in whatever loop this node uses
     # TODO: Nick, depending on the name of the robot, add a list of robots on the left side of the GUI
     def publishRobotStates(self):
+        """
+        Publishes the states of the robots in the robot list tracked by the middleman to the supervisor and operator in
+        one compact message
+        """
         # ask each robot to publish
         robotList = RobotArr()
         for robot in self.activeRobotDictionary.values():
@@ -380,6 +419,10 @@ class Middleman():
         self.statePublisherForSupervisor.publish(robotList)
 
     def assignIdleRobots(self):
+        """
+        Checks for idle robots if there are tasks in the priority queue. Assigns them the tasks so little to no downtime
+        until all tasks are completed.
+        """
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
             if robot.currentTaskName == "IDLE" and len(self.taskPriorityQueue) > 0:
@@ -401,9 +444,15 @@ class Middleman():
                 self.activeTaskList.append(highestPriorityTask)
 
     def publishRobotsLeftInQueue(self):
+        """
+        Publishes the length of the robot operator help queue
+        """
         self.robotsLeftInQueue.publish(len(self.robotsForOperator))
 
     def publishTaskList(self):
+        """
+        Publishes the task list (active tasks being completed and unassigned priority sorted tasks)
+        """
         taskMsgList = TaskMsgArr()
         self.taskPriorityQueue.sort(key=lambda t: t.getPriority())
         for task in (self.activeTaskList + self.taskPriorityQueue):
@@ -415,6 +464,10 @@ class Middleman():
     # When a given amount of time has passed, check for reassignment of robot to highest priority task in the priority
     # queue
     def dynamicReassignmentCheck(self):
+        """
+        When a given amount of time has passed, check for reassignment of robot to highest priority task in the priority
+        queue
+        """
         fiveMinutes = 60
         if time.time() - self.reassignmentCounter > fiveMinutes and len(self.taskPriorityQueue) > 0:
             print("Time's Up")
