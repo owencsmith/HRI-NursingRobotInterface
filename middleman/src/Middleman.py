@@ -278,7 +278,7 @@ class Middleman():
         self.operatorIsBusy = False
 
         # parse robot name
-        robotName = data.data.split()[0]
+        robotName = data.data
         robotThatWasHelped = self.activeRobotDictionary[robotName]
         # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
@@ -338,7 +338,7 @@ class Middleman():
                               'CLN Clean True #00A2FF', 'SOS Stuck False #FF0000']
         return TaskStringResponse(taskCodeStringList)
 
-    # TODO: What does this do??
+    # TODO: What does this do??. Nothing cause we have no way of knowing robot is done. (Autonomy not implemented)
     def alertSupervisorRobotIsDone(self):
         """
         THIS DOES NOTHING I THINK
@@ -469,9 +469,8 @@ class Middleman():
         queue
         """
         fiveMinutes = 60
-        if time.time() - self.reassignmentCounter > fiveMinutes and len(self.taskPriorityQueue) > 0:
-            print("Time's Up")
-            if (len(self.taskPriorityQueue) > 0 and len(self.activeTaskList) > 0):
+        # if the time has elapsed for a reassinment check, and the length of both queues are greater than zero (meaning we can swap)
+        if((time.time() - self.reassignmentCounter > fiveMinutes) and (len(self.taskPriorityQueue) > 0) and (len(self.activeTaskList) > 0)):
                 highestPriorityTask = self.taskPriorityQueue[-1]
                 self.activeTaskList.sort(key=lambda task: task.getPriority())
                 lowestPriorityTask = self.activeTaskList[0]
