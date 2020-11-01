@@ -333,9 +333,9 @@ class Middleman():
         :return:
         """
         # colors are IDL-grey Nav-green DLV-orange Help-red CLN-blue SOS-red
-        taskCodeStringList = ['IDLE Idle False #9BA8AB', 'NAV Navigation True #75D858', 'DLV Delivery True #B27026',
-                              'HLP Help True #A600FF',
-                              'CLN Clean True #00A2FF', 'SOS Stuck False #FF0000']
+        taskCodeStringList = ['IDLE Idle False #9BA8AB True', 'NAV Navigation True #75D858 True',
+                              'DLV Delivery True #B27026 True', 'HLP Help True #A600FF False',
+                              'CLN Clean True #00A2FF True', 'SOS Stuck False #FF0000 True']
         return TaskStringResponse(taskCodeStringList)
 
     # TODO: What does this do??. Nothing cause we have no way of knowing robot is done. (Autonomy not implemented)
@@ -499,9 +499,8 @@ class Middleman():
                     lowestPriorityTask.robotName = 'unassigned'
                     # add previously active task to priority queue
                     self.taskPriorityQueue.append(lowestPriorityTask)
-                    self.reassignmentCounter = time.time()
 
-            self.reassignmentCounter = time.time()
+                self.reassignmentCounter = time.time()
 
 
 middleman = Middleman()
