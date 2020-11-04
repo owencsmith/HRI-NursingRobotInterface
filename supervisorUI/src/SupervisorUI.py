@@ -103,7 +103,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             if(result+1==20):
                 self.SideMenuShowing = False
         else:
-            self.CreateTaskButton.setText("Cancel")
+            self.CreateTaskButton.setText("Close")
             self.SupervisorMap.resize(self.mapWidth - (result + 1) * self.slideInMenuWidth/self.numAnimationSteps, self.windowHeight)
             self.SideMenu.move(self.windowWidth - (result + 1) * self.slideInMenuWidth/self.numAnimationSteps, 0)
             if (result + 1 == 20):
@@ -192,7 +192,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 0, QTableWidgetItem(item.name))
             self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 1, QTableWidgetItem(item.currentTaskName))
             self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 2, QTableWidgetItem(item.status))
-            obSize = 100
+            obSize = 70
             shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
             color = QColor(self.RobotTasks[item.currentTaskName][2])
@@ -202,7 +202,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.RobotNames.append(item.name)
             label = QGraphicsTextItem(item.name)
             label.setX(int(item.pose.pose.pose.position.x*100))
-            label.setY(-int(item.pose.pose.pose.position.y*100+obSize))
+            label.setY(-int(item.pose.pose.pose.position.y*100+obSize*1.2))
             font = QFont("Bavaria")
             font.setPointSize(18)
             font.setWeight(QFont.Bold)
@@ -210,16 +210,17 @@ class SupervisorUI(QtWidgets.QMainWindow):
             label.setFont(font)
             self.scene.addItem(label)
             self.RobotShapes.append(label)
-            item.pose.pose.pose.orientation.z = item.pose.pose.pose.orientation.z+3.14/2
+            quat = item.pose.pose.pose.orientation
+            siny_cosp = 2 * (quat.w * quat.z + quat.x * quat.y)
+            cosy_cosp = 1 - 2 * (quat.y * quat.y + quat.z * quat.z)
+            yaw = math.atan2(siny_cosp, cosy_cosp)
+
+            #item.pose.pose.pose.orientation.z = item.pose.pose.pose.orientation.z+3.14/2
             #making the arrow
-            startArrowX = int(item.pose.pose.pose.position.x*100-math.cos(
-                                         item.pose.pose.pose.orientation.z)*obSize/4)
-            startArrowY = -int(item.pose.pose.pose.position.y*100-math.sin(
-                                         item.pose.pose.pose.orientation.z)*obSize/4)
-            endArrowX =int(item.pose.pose.pose.position.x*100+math.cos(item.pose.pose.pose.orientation.z)*obSize/2-math.cos(
-                                         item.pose.pose.pose.orientation.z)*obSize/4)
-            endArrowY = -int(item.pose.pose.pose.position.y*100+math.sin(item.pose.pose.pose.orientation.z)*obSize/2-math.sin(
-                                         item.pose.pose.pose.orientation.z)*obSize/4)
+            startArrowX = int(item.pose.pose.pose.position.x*100-math.cos(yaw)*obSize/4)
+            startArrowY = -int(item.pose.pose.pose.position.y*100-math.sin(yaw)*obSize/4)
+            endArrowX =int(item.pose.pose.pose.position.x*100+math.cos(yaw)*obSize/2-math.cos(yaw)*obSize/4)
+            endArrowY = -int(item.pose.pose.pose.position.y*100+math.sin(yaw)*obSize/2-math.sin(yaw)*obSize/4)
             line = QGraphicsLineItem(startArrowX,
                                      startArrowY,
                                      endArrowX,
@@ -229,16 +230,16 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.RobotShapes.append(line)
             line = QGraphicsLineItem(endArrowX,
                                     endArrowY,
-                                     endArrowX-math.cos(3.14/4+item.pose.pose.pose.orientation.z)*obSize/4,
-                                     endArrowY+math.sin(3.14/4+item.pose.pose.pose.orientation.z)*obSize/4)
+                                     endArrowX-math.cos(3.14/4+yaw)*obSize/4,
+                                     endArrowY+math.sin(3.14/4+yaw)*obSize/4)
 
             line.setPen(QPen(self.black, 5))
             self.scene.addItem(line)
             self.RobotShapes.append(line)
             line = QGraphicsLineItem(endArrowX,
                                     endArrowY,
-                                     endArrowX- math.cos(3.14 / 4 - item.pose.pose.pose.orientation.z) * obSize / 4,
-                                     endArrowY- math.sin(3.14 / 4 - item.pose.pose.pose.orientation.z) * obSize / 4)
+                                     endArrowX- math.cos(3.14 / 4 - yaw) * obSize / 4,
+                                     endArrowY- math.sin(3.14 / 4 - yaw) * obSize / 4)
 
             line.setPen(QPen(self.black, 5))
             self.scene.addItem(line)
@@ -324,10 +325,34 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.taskPublisher.publish(self.RobotTasksToCode[
                                                self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
                     self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]))
-                self.ToggleSideMenu()
+                if self.LocationPicked:
+                    for item in self.LocationTargetShapes:
+                        self.scene.removeItem(item)
+                self.ErrorLBL.hide()
+                self.populateTaskComboBox()
+                self.taskComboBoxChanged()
+                self.SelectRobot.clear()
+                self.SelectRobot.addItem("unassigned")
+                for item in self.RobotNames:
+                    self.SelectRobot.addItem(item)
+                self.XLocLabel.setText("X:")
+                self.YLocLabel.setText("Y:")
+                self.LocationPicked = False
         else:
             self.taskPublisher.publish(self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " + str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]))
-            self.ToggleSideMenu()
+            if self.LocationPicked:
+                for item in self.LocationTargetShapes:
+                    self.scene.removeItem(item)
+            self.ErrorLBL.hide()
+            self.populateTaskComboBox()
+            self.taskComboBoxChanged()
+            self.SelectRobot.clear()
+            self.SelectRobot.addItem("unassigned")
+            for item in self.RobotNames:
+                self.SelectRobot.addItem(item)
+            self.XLocLabel.setText("X:")
+            self.YLocLabel.setText("Y:")
+            self.LocationPicked = False
 
     def taskChangeCallback(self, message):
         self.robotTaskChangeSignal.emit(message)
