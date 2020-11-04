@@ -9,8 +9,6 @@ from middleman.srv import TaskString, TaskStringResponse
 from Task import *
 
 
-
-
 # TODO: Use the name of the robot to determine all the topics for that specific robot since they are all the same
 # except the name
 
@@ -36,7 +34,7 @@ class Middleman():
             'CLN': 50,
             'HLP': 100,
             'DLV': 200,
-            'IDLE':0
+            'IDLE': 0
         }
         self.taskFns = {
             'NAV': self.navTask,
@@ -81,15 +79,24 @@ class Middleman():
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.taskListPublisher = rospy.Publisher('/supervisor/taskList', TaskMsgArr, queue_size=10)
-        self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size = 10)
+        self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size=10)
         rospy.sleep(1)
 
         # servers
         self.taskCodeServer = rospy.Service('/supervisor/taskCodes', TaskString, self.sendTaskCodesToSupervisor)
 
-    #check data length >= 4
+    # check data length >= 4
     # process task determines which queue to put the task in
     def processTask(self, data):
+        """
+        This function determines which task is being asked to run on the robot
+        and calls the apprropriate task function. It also adds the task to the
+        active task list if a robot is assigned, or a priority queue if no robot
+        is assigned. Please look at the task code data structure above to see what that task codes mean. 
+        :param data: the string containing the robot and task information.
+                     i.e. <task name> <robot name> <X coordinate> <Y coordinate>
+        :return None
+        """
         # Have to know if the task has been unnassigned
         # have to know what the task is
         # Task Strings: 'task_name robot_name X Y [vars ...]'
@@ -104,22 +111,34 @@ class Middleman():
             variables = dataList[4:]
         else:
             variables = None
-        if(taskName != 'SOS'):
+        if (taskName != 'SOS'):
             X = float(dataList[2])
             Y = float(dataList[3])
             newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, variables)
             newTaskMsg = newTask.convertTaskToTaskMsg()
             if robotName != "unassigned":
+                # remove current task form active task list
+                oldTaskMsg = self.activeRobotDictionary[robotName].currentTask
+                for task in self.activeTaskList:
+                    if oldTaskMsg.ID == task.getID():
+                        self.activeTaskList.remove(task)
+                        break
                 self.taskFns[taskName](newTaskMsg)
                 self.activeTaskList.append(newTask)
             else:
                 self.taskPriorityQueue.append(newTask)
                 self.taskPriorityQueue.sort(key=lambda task: task.getPriority())
             print('Called Task Function')
-        elif(taskName == 'SOS'):
+        elif (taskName == 'SOS'):
             self.passRobotToQueueForOperator(robotName)
 
     def navTask(self, taskMsg):
+        """
+        Performs a navigation task. Sets the robots task to NAV and commands it to a specified
+        position.
+        :param taskMsg: A taskMsg ROS message. Contains X and Y information as well as task code.
+        :return:  none
+        """
         print("Processing Nav Goal")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
@@ -129,6 +148,12 @@ class Middleman():
         pass
 
     def clnTask(self, taskMsg):
+        """
+         Sets the robots task to CLN and commands it to a specified location. Since no robot autonomy has yet been
+         implemented, this function can only navigate to the goal. Future work can implement the autonomy.
+         :param taskMsg: A taskMsg ROS message. Contains X and Y information as well as task code.
+         :return:  none
+         """
         print("Processing Cleaning Task")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
@@ -137,8 +162,14 @@ class Middleman():
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
         pass
 
-    #@TODO without autonomy work the same as nav task
+    # @TODO without autonomy work the same as nav task
     def dlvTask(self, taskMsg):
+        """
+         Sets the robots task to DLV and commands it to a specified location. Since no robot autonomy has yet been
+         implemented, this function can only navigate to the goal. Future work can implement the autonomy.
+         :param taskMsg: A taskMsg ROS message. Contains X and Y information as well as task code.
+         :return:  none
+         """
         print("Processing Delivery Task")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
@@ -158,6 +189,12 @@ class Middleman():
         pass
 
     def hlpTask(self, taskMsg):
+        """
+         Sets the robots task to HLP and commands it to a specified location. Since no robot autonomy has yet been
+         implemented, this function can only navigate to the goal. Future work can implement the autonomy.
+         :param taskMsg: A taskMsg ROS message. Contains X and Y information as well as task code.
+         :return:  none
+         """
         print("Processing Help Task")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
@@ -165,14 +202,28 @@ class Middleman():
         currentRobot.currentTaskName = taskMsg.taskName
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
 
-    #do nothing
+    # do nothing
     def idleTask(self, taskMsg):
+        """
+         Sets the robots task to IDLE and commands it to a specified location. The robot will stop and wait for a
+         different task.
+         :param taskMsg: A taskMsg ROS message.
+         :return:  none
+         """
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
-        self.sendRobotToPos(currentRobot, float(currentRobot.pose.pose.pose.position.x), float(currentRobot.pose.pose.pose.position.y))
+        self.sendRobotToPos(currentRobot, float(currentRobot.pose.pose.pose.position.x),
+                            float(currentRobot.pose.pose.pose.position.y))
 
     def sendRobotToPos(self, currentRobot, X, Y):
+        """
+        Given a robot and a location, sends the robot to that location by publishing to
+        'robot_namespace'/move_base_simple/goal
+        :param currentRobot: The robot to move
+        :param X: the x location on the map
+        :param Y: the y location on the map
+        """
         # publish coordinates to move_base of specific robot
         poseStamped = PoseStamped()
         poseStamped.pose.position.x = X
@@ -185,16 +236,19 @@ class Middleman():
         if currentRobot.name == 'trina2':
             topic = '/move_base_simple/goal'
         else:
-            topic = '/' + currentRobot.name+'/move_base_simple/goal'
+            topic = '/' + currentRobot.name + '/move_base_simple/goal'
         print(topic)
         self.goal_publisher = rospy.Publisher(topic, PoseStamped, queue_size=10)
         rospy.sleep(2)
         self.goal_publisher.publish(poseStamped)
         print('Publishing Nav Goal')
 
-    # When sos message is published
-    # Add to queue, sort
     def passRobotToQueueForOperator(self, robotName):
+        """
+        This is a callback for the SOS message from the supervisor. Adds a robot in trouble to the operator queue and
+        sorts them by priority.
+        :param robotName: the robot that needs help
+        """
         print("Passing robot: ", robotName, " to operator")
         # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
@@ -215,12 +269,16 @@ class Middleman():
             self.sendNewRobotToOperator.publish(robotToHelp)
             self.operatorIsBusy = True
 
-    # Operator wants next robot, if available
     def advanceRobotHelpQueue(self, data):
+        """
+        When an operator finishes with a robot, if there is another robot in need of assistance load it into the
+        operator GUI
+        :param data: the robot name that was previously being helped by the operator
+        """
         self.operatorIsBusy = False
 
         # parse robot name
-        robotName = data.data.split()[0]
+        robotName = data.data
         robotThatWasHelped = self.activeRobotDictionary[robotName]
         # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
@@ -235,8 +293,13 @@ class Middleman():
             self.sendNewRobotToOperator.publish(robotToHelp)
             self.operatorIsBusy = True
 
-    #TODO: add help task to the priority queue or active queue
+    # TODO: add help task to the priority queue or active queue
     def sendAnotherRobotForCameraViews(self, data):
+        """
+        Part of the help task. Called when the operator requests another camera view (provided by head camera of
+        additional robot
+        :param data: robot name of the robot that is being helped by the operator
+        """
         print("Requesting another robot for camera views")
         robotAvailableForHelp = False
         robotThatWillHelp = None
@@ -264,12 +327,23 @@ class Middleman():
         pass
 
     def sendTaskCodesToSupervisor(self, req):
+        """
+        A boot message that provides color display infor and task type to the supervisor UI
+        :param req:
+        :return:
+        """
         # colors are IDL-grey Nav-green DLV-orange Help-red CLN-blue SOS-red
-        taskCodeStringList = ['IDLE Idle False #9BA8AB', 'NAV Navigation True #75D858', 'DLV Delivery True #B27026', 'HLP Help True #A600FF',
-                              'CLN Clean True #00A2FF', 'SOS Stuck False #FF0000']
+        taskCodeStringList = ['IDLE Idle False #9BA8AB True', 'NAV Navigation True #75D858 True',
+                              'DLV Delivery True #B27026 True', 'HLP Help True #A600FF False',
+                              'CLN Clean True #00A2FF True', 'SOS Stuck False #FF0000 True']
         return TaskStringResponse(taskCodeStringList)
 
+    # TODO: What does this do??. Nothing cause we have no way of knowing robot is done. (Autonomy not implemented)
     def alertSupervisorRobotIsDone(self):
+        """
+        THIS DOES NOTHING I THINK
+        :return:
+        """
         print("Robot has finished task. Going to IDLE")
         # find robot in dicionary
         # change robot task to IDLE
@@ -280,6 +354,12 @@ class Middleman():
     # The message that triggers this callback function should give all the unique information about the robot
     # It should have the unique move base and amcl topics
     def createNewRobot(self, data):
+        """
+        When a robot sends a boot message. Builds a robot message type and adds it to the robots tracked by the
+         middleman
+        :param data: the robot name
+        :return:
+        """
         print("Registering new robot. Robot name: " + str(data.data))
         newRobot = Robot()
         newRobot.name = data.data
@@ -289,6 +369,7 @@ class Middleman():
         initialTaskMsg = initialTask.convertTaskToTaskMsg()
         newRobot.currentTaskName = initialTaskMsg.taskName
         newRobot.currentTask = initialTaskMsg
+        self.activeTaskList.append(initialTask)
 
         # newRobot.name+
         # print(newRobot.name+'/amcl_pose')
@@ -297,7 +378,7 @@ class Middleman():
                 newRobot.name] = '/amcl_pose'
         else:
             self.activeRobotAMCLTopics[
-            newRobot.name] = newRobot.name+'/amcl_pose'
+                newRobot.name] = newRobot.name + '/amcl_pose'
         # if the robot is not already in the dictionary
         if (newRobot.name not in self.activeRobotDictionary.keys()):
             self.activeRobotDictionary[newRobot.name] = newRobot
@@ -319,6 +400,10 @@ class Middleman():
     # call the methods below in whatever loop this node uses
     # TODO: Nick, depending on the name of the robot, add a list of robots on the left side of the GUI
     def publishRobotStates(self):
+        """
+        Publishes the states of the robots in the robot list tracked by the middleman to the supervisor and operator in
+        one compact message
+        """
         # ask each robot to publish
         robotList = RobotArr()
         for robot in self.activeRobotDictionary.values():
@@ -334,6 +419,10 @@ class Middleman():
         self.statePublisherForSupervisor.publish(robotList)
 
     def assignIdleRobots(self):
+        """
+        Checks for idle robots if there are tasks in the priority queue. Assigns them the tasks so little to no downtime
+        until all tasks are completed.
+        """
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
             if robot.currentTaskName == "IDLE" and len(self.taskPriorityQueue) > 0:
@@ -341,15 +430,29 @@ class Middleman():
                 highestPriorityTask = self.taskPriorityQueue.pop()
                 highestPriorityTask.robotName = robot.name
                 taskMsg = highestPriorityTask.convertTaskToTaskMsg()
+
+                #print(self.activeTaskList)
+                for task in self.activeTaskList:
+                    if robot.currentTask.ID == task.getID():
+                        self.activeTaskList.remove(task)
+                        break
+                #print(self.activeTaskList)
+
                 robot.currentTask = taskMsg
                 robot.currentTaskName = taskMsg.taskName
                 self.taskFns[highestPriorityTask.taskName](taskMsg)
                 self.activeTaskList.append(highestPriorityTask)
 
     def publishRobotsLeftInQueue(self):
+        """
+        Publishes the length of the robot operator help queue
+        """
         self.robotsLeftInQueue.publish(len(self.robotsForOperator))
 
     def publishTaskList(self):
+        """
+        Publishes the task list (active tasks being completed and unassigned priority sorted tasks)
+        """
         taskMsgList = TaskMsgArr()
         self.taskPriorityQueue.sort(key=lambda t: t.getPriority())
         for task in (self.activeTaskList + self.taskPriorityQueue):
@@ -361,38 +464,43 @@ class Middleman():
     # When a given amount of time has passed, check for reassignment of robot to highest priority task in the priority
     # queue
     def dynamicReassignmentCheck(self):
+        """
+        When a given amount of time has passed, check for reassignment of robot to highest priority task in the priority
+        queue
+        """
         fiveMinutes = 60
-        if time.time() - self.reassignmentCounter > fiveMinutes and len(self.taskPriorityQueue) > 0:
-            print("Time's Up")
-            if(len(self.taskPriorityQueue) > 0 and len(self.activeTaskList) > 0):
+        # if the time has elapsed for a reassinment check, and the length of both queues are greater than zero (meaning we can swap)
+        if((time.time() - self.reassignmentCounter > fiveMinutes) and (len(self.taskPriorityQueue) > 0) and (len(self.activeTaskList) > 0)):
                 highestPriorityTask = self.taskPriorityQueue[-1]
                 self.activeTaskList.sort(key=lambda task: task.getPriority())
                 lowestPriorityTask = self.activeTaskList[0]
                 if highestPriorityTask.getPriority() > lowestPriorityTask.getPriority():
-                    print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(highestPriorityTask.getPriority()))
+                    print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(
+                        highestPriorityTask.getPriority()))
                     swappedTasks = TaskMsgArr()
                     # swap the active task with high  [Active, High Priority]
                     swappedTasks.taskMsgs.append(lowestPriorityTask.convertTaskToTaskMsg())
                     swappedTasks.taskMsgs.append(highestPriorityTask.convertTaskToTaskMsg())
                     self.taskReassignmentPublisher.publish(swappedTasks)
-                    #remove from priority queue
+                    # remove from priority queue
                     self.taskPriorityQueue.pop()
-                    #reassign robot name
+                    # reassign robot name
                     highestPriorityTask.robotName = lowestPriorityTask.robotName
-                    #add new task to active
+                    # add new task to active
                     self.activeTaskList.append(highestPriorityTask)
-                    #remove now inactive from activeList
+                    self.taskFns[highestPriorityTask.taskName](highestPriorityTask)  # call task function
+
+                    # remove now inactive from activeList
                     self.activeTaskList.remove(lowestPriorityTask)
                     robotBeingReassigned = self.activeRobotDictionary[lowestPriorityTask.robotName]
                     robotBeingReassigned.currentTask = highestPriorityTask.convertTaskToTaskMsg()
                     robotBeingReassigned.currentTaskName = highestPriorityTask.taskName
-                    #reassign active task to unassigned status
+                    # reassign active task to unassigned status
                     lowestPriorityTask.robotName = 'unassigned'
-                    #add previously active task to priority queue
+                    # add previously active task to priority queue
                     self.taskPriorityQueue.append(lowestPriorityTask)
-                    self.reassignmentCounter = time.time()
-            self.reassignmentCounter = time.time()
 
+                self.reassignmentCounter = time.time()
 
 
 middleman = Middleman()
