@@ -21,12 +21,23 @@ class OperatorUI(QtWidgets.QMainWindow):
         super(OperatorUI, self).__init__()
         self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
         self.fitToScreen(width, height)
-        self.scaleFactor = 0.4 * self.mapWidth / 1500  # the map was designed for a 1500 pixel square map.This adjusts for the screen size
+        self.numAnimationSteps = 20
+        #self.scaleFactor = 0.4 * self.mapWidth / 1500  # the map was designed for a 1500 pixel square map.This adjusts for the screen size
+        self.secondCameraShowing=False
+        self.SecondCameraSlideInThread = SecondCameraSlideInThread(self.numAnimationSteps)
+        self.SecondCameraSlideInThread.signal.connect(self.SecondCameraSlideInThreadCallback)
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.OperatorMap.setMouseTracking(True)
-        self.OperatorMap.wheelEvent = self.wheelEvent
         self.OperatorMap.setScene(self.scene)
+        self.RequestCameraBTN.clicked.connect(self.RequestCameraBTNCallback)
+
+    def mapClickEventHandler(self, event):
+        pass
+
+
+    def RequestCameraBTNCallback(self):
+        self.SecondCameraSlideInThread.start()
 
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
@@ -65,8 +76,35 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.RequestCameraBTN.resize(robotDescWidth, self.windowHeight*0.05)
         self.DoneHelpingBTN.move(0, self.windowHeight*0.9)
         self.DoneHelpingBTN.resize(robotDescWidth, self.windowHeight*0.05)
+        self.Camera1.move(robotDescWidth, 0)
+        self.Camera1.resize(self.windowWidth-robotDescWidth, self.windowHeight)
+        self.Camera2.move(robotDescWidth, self.windowHeight)
+        self.Camera2.resize(self.windowWidth - robotDescWidth, self.windowHeight/2)
 
+    def SecondCameraSlideInThreadCallback(self, result):
+        if(self.secondCameraShowing):
+            self.Camera1.resize(self.Camera1.width(), self.windowHeight/2+(result + 1)*(self.windowHeight/2)/self.numAnimationSteps)
+            self.Camera2.move(self.Camera2.x(), self.windowHeight/2+(result + 1)*(self.windowHeight/2)/self.numAnimationSteps)
+            if(result+1==20):
+                self.secondCameraShowing = False
+        else:
+            self.Camera1.resize(self.Camera1.width(), self.windowHeight - (result + 1) * (self.windowHeight/2)/self.numAnimationSteps)
+            self.Camera2.move(self.Camera2.x(),self.windowHeight - (result + 1) * (self.windowHeight/2)/self.numAnimationSteps)
+            if (result + 1 == 20):
+                self.secondCameraShowing = True
 
+class SecondCameraSlideInThread(QThread):
+    signal = pyqtSignal('PyQt_PyObject')
+
+    def __init__(self, numSteps):
+        QThread.__init__(self)
+        self.numSec = 0.2
+        self.numSteps = numSteps
+
+    def run(self):
+        for x in range(0, self.numSteps):
+            time.sleep(self.numSec / self.numSteps)
+            self.signal.emit(x)
 
 if __name__ == '__main__':
     rospy.init_node('OperatorUI')
