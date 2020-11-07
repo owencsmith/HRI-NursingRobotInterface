@@ -72,7 +72,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.SupervisorMap.setMouseTracking(True)
-        #todo self.scene.mouseMoveEvent = self.MouseMovementEvent
         self.SupervisorMap.wheelEvent = self.wheelEvent
         self.SupervisorMap.setScene(self.scene)
         self.loadMap(map)
