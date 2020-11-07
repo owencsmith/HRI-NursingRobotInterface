@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rospy
+import rospkg
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
     QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem
@@ -12,7 +13,8 @@ import json
 import time
 import math
 from std_msgs.msg import *
-designerFile = "OperatorUI.ui" #TODO make this visible inside rosrun
+rospack = rospkg.RosPack()
+designerFile = rospack.get_path('operatorUI')+"/src/OperatorUI.ui"
 
 class OperatorUI(QtWidgets.QMainWindow):
     def __init__(self, width, height):
@@ -33,6 +35,10 @@ class OperatorUI(QtWidgets.QMainWindow):
             self.windowHeight = int(self.windowWidth*desAspY/desAspX)
         self.setFixedSize(self.windowWidth, self.windowHeight)
         #other objects in the UI get moved and resized here
+        self.RequestCameraBTN.move(0, self.windowHeight-100)
+        self.RequestCameraBTN.resize(self.windowWidth*0.08, 100)
+        self.DoneHelpingBTN.move(0, self.windowHeight-200)
+        self.DoneHelpingBTN.resize(self.windowWidth*0.08, 100)
 
 
 if __name__ == '__main__':

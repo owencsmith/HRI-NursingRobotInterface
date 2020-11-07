@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rospy
+import rospkg
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
     QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem
@@ -15,8 +16,9 @@ from std_msgs.msg import *
 from supervisorUI.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from supervisorUI.srv import TaskString, TaskStringResponse
-designerFile = "SupervisorUI.ui" #TODO make this visible inside rosrun
-map = "Maps/Hospital" #TODO make this visible inside rosrun
+rospack = rospkg.RosPack()
+designerFile = rospack.get_path('supervisorUI')+"/src/SupervisorUI.ui"
+map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital"
 
 class SupervisorUI(QtWidgets.QMainWindow):
     robotUpdateSignal = pyqtSignal('PyQt_PyObject')
