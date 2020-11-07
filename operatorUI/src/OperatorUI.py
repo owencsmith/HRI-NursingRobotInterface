@@ -13,6 +13,7 @@ import json
 import time
 import math
 from std_msgs.msg import *
+from middleman.msg import Robot
 rospack = rospkg.RosPack()
 designerFile = rospack.get_path('operatorUI')+"/src/OperatorUI.ui"
 
@@ -32,12 +33,24 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.OperatorMap.setScene(self.scene)
         self.RequestCameraBTN.clicked.connect(self.RequestCameraBTNCallback)
 
+        # Middleman communication stuff
+        self.doneHelpingRobotPublisher = rospy.Publisher('/operator/done_helping', String, queue_size=10)
+        self.DoneHelpingBTN.clicked.connect(self.DoneHelpingBTNCallback)
+        self.currentRobot = None
+        self.newRobotSubscriber = rospy.Subscriber('/operator/new_robot', Robot, self.NewRobotCallback)
+
     def mapClickEventHandler(self, event):
         pass
 
+    def DoneHelpingBTNCallback(self):
+        self.doneHelpingRobotPublisher.publish(self.currentRobot.robotName)
 
     def RequestCameraBTNCallback(self):
         self.SecondCameraSlideInThread.start()
+
+    def NewRobotCallback(self, data):
+        print(data.robotName)
+        self.currentRobot = data
 
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
