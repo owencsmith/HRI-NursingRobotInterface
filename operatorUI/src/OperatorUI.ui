@@ -19,7 +19,7 @@
      <rect>
       <x>10</x>
       <y>950</y>
-      <width>279</width>
+      <width>451</width>
       <height>44</height>
      </rect>
     </property>
@@ -32,12 +32,119 @@
      <rect>
       <x>10</x>
       <y>1020</y>
-      <width>279</width>
+      <width>451</width>
       <height>48</height>
      </rect>
     </property>
     <property name="text">
      <string>Request Camera</string>
+    </property>
+   </widget>
+   <widget class="QFrame" name="RobotDescriptionFrame">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>640</y>
+      <width>441</width>
+      <height>281</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">background-color: rgb(211, 215, 207);</string>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="QLabel" name="robotNameLBL">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>171</width>
+       <height>34</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Robot Name:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="NameHereLBL">
+     <property name="geometry">
+      <rect>
+       <x>230</x>
+       <y>10</y>
+       <width>171</width>
+       <height>34</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Name Here</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="TaskLBL">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>60</y>
+       <width>129</width>
+       <height>34</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Task:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="TaskHereLBL">
+     <property name="geometry">
+      <rect>
+       <x>230</x>
+       <y>50</y>
+       <width>129</width>
+       <height>34</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Task Here</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="ProblemLBL">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>100</y>
+       <width>129</width>
+       <height>34</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Problem:</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="ProblemHereLBL">
+     <property name="geometry">
+      <rect>
+       <x>230</x>
+       <y>100</y>
+       <width>129</width>
+       <height>34</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Problem Here</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QGraphicsView" name="OperatorMap">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>10</y>
+      <width>461</width>
+      <height>611</height>
+     </rect>
     </property>
    </widget>
   </widget>
