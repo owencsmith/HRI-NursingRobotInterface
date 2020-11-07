@@ -13,8 +13,34 @@
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
-  <widget class="QWidget" name="centralwidget"/>
-  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QPushButton" name="DoneHelpingBTN">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>950</y>
+      <width>279</width>
+      <height>44</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Done Helping</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="RequestCameraBTN">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>1020</y>
+      <width>279</width>
+      <height>48</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Request Camera</string>
+    </property>
+   </widget>
+  </widget>
  </widget>
  <resources/>
  <connections/>
