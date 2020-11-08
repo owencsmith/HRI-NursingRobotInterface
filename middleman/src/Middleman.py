@@ -304,26 +304,30 @@ class Middleman():
         robotAvailableForHelp = False
         robotThatWillHelp = None
         # Is there an IDLE robot that CAN be used?
+        robotToNavigateTo = self.activeRobotDictionary[data.data.split()[0]]
+        # grab the pose of the robot to navigate to
+        robotToNavigateToPose = robotToNavigateTo.pose
+        robotToNavigateToX = robotToNavigateToPose.pose.pose.position.x + .001
+        robotToNavigateToY = robotToNavigateToPose.pose.pose.position.y + .001
         for robot in self.activeRobotDictionary.values():
-            if (robot.currentTask == "IDLE"):
+            if (robot.currentTaskName == "IDLE"):
                 # find it and grab it from the dictionary
-                robot.currentTask = "HLP"
+                robot.currentTaskName = "HLP"
                 # publish that a robot is on its way
                 robot.status = "OPC"
                 robotAvailableForHelp = True
                 robotThatWillHelp = robot
-                break
-        if (not robotAvailableForHelp):
-            return False
-        else:
-            # parse the string for the robot to navigate to for more views
-            robotToNavigateTo = self.activeRobotDictionary[data.data.split()[0]]
-            # grab the pose of the robot to navigate to
-            robotToNavigateToPose = robotToNavigateTo.pose
-            robotToNavigateToX = robotToNavigateToPose.pose.pose.position.x
-            robotToNavigateToY = robotToNavigateToPose.pose.pose.position.y
-            # Tell the IDLE robot to navigate to the robot that needs more views
-            self.sendRobotToPos(str(robotThatWillHelp.name), robotToNavigateToX, robotToNavigateToY)
+                # parse the string for the robot to navigate to for more views
+                helpTask = Task("HLP", self.taskPrios["HLP"], robotThatWillHelp.name, robotToNavigateToX, robotToNavigateToY, None)
+                helpTaskMsg = helpTask.convertTaskToTaskMsg()
+                self.hlpTask(helpTaskMsg)
+
+
+        if(not robotAvailableForHelp):
+            helpTask = Task("HLP", self.taskPrios["HLP"], "unassigned", robotToNavigateToX, robotToNavigateToY, None)
+            self.taskPriorityQueue.append(helpTask)
+
+
         pass
 
     def sendTaskCodesToSupervisor(self, req):
