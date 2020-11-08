@@ -16,6 +16,7 @@ from std_msgs.msg import *
 from middleman.msg import Robot
 rospack = rospkg.RosPack()
 designerFile = rospack.get_path('operatorUI')+"/src/OperatorUI.ui"
+map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital"
 
 class OperatorUI(QtWidgets.QMainWindow):
     def __init__(self, width, height):
@@ -23,16 +24,34 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
         self.fitToScreen(width, height)
         self.numAnimationSteps = 20
-        #self.scaleFactor = 0.4 * self.mapWidth / 1500  # the map was designed for a 1500 pixel square map.This adjusts for the screen size
+        self.scaleFactor = 1.5 * self.OperatorMap.width() / 1500  # the map was designed for a 1500 pixel square map.This adjusts for the screen size
         self.secondCameraShowing=False
         self.SecondCameraSlideInThread = SecondCameraSlideInThread(self.numAnimationSteps)
         self.SecondCameraSlideInThread.signal.connect(self.SecondCameraSlideInThreadCallback)
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
+        self.augmentedRealityScene = QGraphicsScene()
+        self.AugmentedRealityPanel.setScene(self.augmentedRealityScene)
         self.OperatorMap.setMouseTracking(True)
         self.OperatorMap.setScene(self.scene)
         self.RequestCameraBTN.clicked.connect(self.RequestCameraBTNCallback)
-
+        self.black = QColor(qRgb(0, 0, 0))
+        self.blue = QColor(qRgb(30, 144, 255))
+        self.red = QColor(qRgb(220, 20, 60))
+        self.green = QColor(qRgb(0, 255, 127))
+        self.Orange = QColor(qRgb(255, 165, 0))
+        self.yellow = QColor(qRgb(255, 255, 0))
+        self.purple = QColor(qRgb(238, 130, 238))
+        self.magenta = QColor(qRgb(255, 0, 255))
+        self.white = QColor(qRgb(255, 255, 255))
+        self.loadMap(map)
+        ##### this shape is just to test that i can draw things over the camera feed
+        shape = QGraphicsEllipseItem(0,0, 50,50)
+        shape.setPen(QPen(self.black))
+        color = self.black
+        shape.setBrush(QBrush(color, Qt.SolidPattern))
+        self.augmentedRealityScene.addItem(shape)
+        ######
         # Middleman communication stuff
         self.doneHelpingRobotPublisher = rospy.Publisher('/operator/done_helping', String, queue_size=10)
         self.DoneHelpingBTN.clicked.connect(self.DoneHelpingBTNCallback)
@@ -51,6 +70,31 @@ class OperatorUI(QtWidgets.QMainWindow):
     def NewRobotCallback(self, data):
         print(data.robotName)
         self.currentRobot = data
+
+    def loadMap(self, mapLocation):
+        with open(mapLocation) as file:
+            mapObjList = json.load(file)
+        for item in mapObjList["objects"]:
+            if (item["type"] == "rect"):
+                shape = QGraphicsRectItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
+                                          item["length"], item["width"])
+                shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
+                shape.setPen(QPen(self.black))
+                shape.setBrush(QBrush(self.black, Qt.SolidPattern))
+                shape.setRotation(item["rotation"])
+                self.scene.addItem(shape)
+            elif (item["type"] == "text"):
+                label = QGraphicsTextItem(item["text"])
+                label.setX(item["centerX"] - item["length"] / 2)
+                label.setY(-item["centerY"] - item["width"] / 2)
+                font = QFont("Bavaria")
+                font.setPointSize(24)
+                font.setWeight(QFont.Bold)
+                label.setFont(font)
+                label.setRotation(item["rotation"])
+                self.scene.addItem(label)
+        self.OperatorMap.scale(self.scaleFactor, self.scaleFactor)
+        self.OperatorMap.rotate(45)#will change this later to rotate with the robot
 
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
@@ -91,17 +135,21 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.DoneHelpingBTN.resize(robotDescWidth, self.windowHeight*0.05)
         self.Camera1.move(robotDescWidth, 0)
         self.Camera1.resize(self.windowWidth-robotDescWidth, self.windowHeight)
+        self.AugmentedRealityPanel.move(robotDescWidth, 0)
+        self.AugmentedRealityPanel.resize(self.windowWidth-robotDescWidth, self.windowHeight)
         self.Camera2.move(robotDescWidth, self.windowHeight)
         self.Camera2.resize(self.windowWidth - robotDescWidth, self.windowHeight/2)
 
     def SecondCameraSlideInThreadCallback(self, result):
         if(self.secondCameraShowing):
             self.Camera1.resize(self.Camera1.width(), self.windowHeight/2+(result + 1)*(self.windowHeight/2)/self.numAnimationSteps)
+            self.AugmentedRealityPanel.resize(self.Camera1.width(), self.windowHeight/2+(result + 1)*(self.windowHeight/2)/self.numAnimationSteps)
             self.Camera2.move(self.Camera2.x(), self.windowHeight/2+(result + 1)*(self.windowHeight/2)/self.numAnimationSteps)
             if(result+1==20):
                 self.secondCameraShowing = False
         else:
             self.Camera1.resize(self.Camera1.width(), self.windowHeight - (result + 1) * (self.windowHeight/2)/self.numAnimationSteps)
+            self.AugmentedRealityPanel.resize(self.Camera1.width(), self.windowHeight - (result + 1) * (self.windowHeight/2)/self.numAnimationSteps)
             self.Camera2.move(self.Camera2.x(),self.windowHeight - (result + 1) * (self.windowHeight/2)/self.numAnimationSteps)
             if (result + 1 == 20):
                 self.secondCameraShowing = True
