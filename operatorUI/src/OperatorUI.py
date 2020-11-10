@@ -55,13 +55,6 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.magenta = QColor(qRgb(255, 0, 255))
         self.white = QColor(qRgb(255, 255, 255))
         self.loadMap(map)
-        ##### this shape is just to test that i can draw things over the camera feed
-        #shape = QGraphicsEllipseItem(0,0, 50,50)
-        #shape.setPen(QPen(self.black))
-        #color = self.black
-        #shape.setBrush(QBrush(color, Qt.SolidPattern))
-        #self.augmentedRealityScene.addItem(shape)
-        ######
         # Middleman communication stuff
         self.doneHelpingRobotPublisher = rospy.Publisher('/operator/done_helping', String, queue_size=10)
         self.DoneHelpingBTN.clicked.connect(self.DoneHelpingBTNCallback)
