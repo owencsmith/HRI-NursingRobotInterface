@@ -97,11 +97,15 @@ class Middleman():
                      i.e. <task name> <robot name> <X coordinate> <Y coordinate>
         :return None
         """
+
         # Have to know if the task has been unnassigned
         # have to know what the task is
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
-        dataList = data.data.split()
+        if type(data) == str:
+            dataList = data.split()
+        else:
+            dataList = data.data.split()
         taskName = dataList[0]
         # passed as unassigned if task is not assigned
         robotName = dataList[1]
@@ -198,6 +202,7 @@ class Middleman():
         print("Processing Help Task")
         # parses Robot name XY string and sends to robots movebase
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.status = 'OPC'
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
@@ -249,6 +254,8 @@ class Middleman():
         sorts them by priority.
         :param robotName: the robot that needs help
         """
+        if robotName == 'unassigned':
+            return
         print("Passing robot: ", robotName, " to operator")
         # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
@@ -304,27 +311,26 @@ class Middleman():
         robotAvailableForHelp = False
         robotThatWillHelp = None
         # Is there an IDLE robot that CAN be used?
-        for robot in self.activeRobotDictionary.values():
-            if (robot.currentTask == "IDLE"):
-                # find it and grab it from the dictionary
-                robot.currentTask = "HLP"
-                # publish that a robot is on its way
-                robot.status = "OPC"
-                robotAvailableForHelp = True
-                robotThatWillHelp = robot
-                break
-        if (not robotAvailableForHelp):
-            return False
-        else:
-            # parse the string for the robot to navigate to for more views
-            robotToNavigateTo = self.activeRobotDictionary[data.data.split()[0]]
-            # grab the pose of the robot to navigate to
-            robotToNavigateToPose = robotToNavigateTo.pose
-            robotToNavigateToX = robotToNavigateToPose.pose.pose.position.x
-            robotToNavigateToY = robotToNavigateToPose.pose.pose.position.y
-            # Tell the IDLE robot to navigate to the robot that needs more views
-            self.sendRobotToPos(str(robotThatWillHelp.name), robotToNavigateToX, robotToNavigateToY)
-        pass
+        robotToNavigateTo = self.activeRobotDictionary[data.data.split()[0]]
+        # grab the pose of the robot to navigate to
+        robotToNavigateToPose = robotToNavigateTo.pose
+        buffer = 0.5
+        robotToNavigateToX = robotToNavigateToPose.pose.pose.position.x + buffer
+        robotToNavigateToY = robotToNavigateToPose.pose.pose.position.y + buffer
+
+        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY)
+        self.processTask(info_str)
+        # # parse the string for the robot to navigate to for more views
+        # helpTask = Task("HLP", self.taskPrios["HLP"], robotThatWillHelp.name, robotToNavigateToX, robotToNavigateToY, None)
+        # helpTaskMsg = helpTask.convertTaskToTaskMsg()
+        # self.hlpTask(helpTaskMsg)
+
+
+        #
+        # if(not robotAvailableForHelp):
+        #     helpTask = Task("HLP", self.taskPrios["HLP"], "unassigned", robotToNavigateToX, robotToNavigateToY, None)
+        #     self.taskPriorityQueue.append(helpTask)
+
 
     def sendTaskCodesToSupervisor(self, req):
         """

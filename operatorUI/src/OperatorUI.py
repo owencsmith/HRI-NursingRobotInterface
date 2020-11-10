@@ -55,21 +55,31 @@ class OperatorUI(QtWidgets.QMainWindow):
         # Middleman communication stuff
         self.doneHelpingRobotPublisher = rospy.Publisher('/operator/done_helping', String, queue_size=10)
         self.DoneHelpingBTN.clicked.connect(self.DoneHelpingBTNCallback)
+        self.DoneHelpingBTN.setEnabled(False)
         self.currentRobot = None
         self.newRobotSubscriber = rospy.Subscriber('/operator/new_robot', Robot, self.NewRobotCallback)
+        self.requestAnotherRobotForCameraViews= rospy.Publisher('/operator/request_extra_views_from_robot', String, queue_size=10)
 
     def mapClickEventHandler(self, event):
         pass
 
     def DoneHelpingBTNCallback(self):
-        self.doneHelpingRobotPublisher.publish(self.currentRobot.robotName)
+        self.doneHelpingRobotPublisher.publish(self.currentRobot.name)
+        self.DoneHelpingBTN.setEnabled(False)
+        self.NameHereLBL.setText("")
+        self.TaskHereLBL.setText("")
 
     def RequestCameraBTNCallback(self):
         self.SecondCameraSlideInThread.start()
-
+        self.requestAnotherRobotForCameraViews.publish(self.currentRobot.name)
+        
     def NewRobotCallback(self, data):
-        print(data.robotName)
+        self.DoneHelpingBTN.setDisabled(False)
+        print(data.name)
         self.currentRobot = data
+        self.NameHereLBL.setText(data.name)
+        self.TaskHereLBL.setText(data.currentTaskName)
+
 
     def loadMap(self, mapLocation):
         with open(mapLocation) as file:
