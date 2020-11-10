@@ -5,7 +5,8 @@ from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
     QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel
+from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel, \
+    QImage, QPixmap
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint, QPointF
 from PyQt5.QtCore import Qt, QLineF, QRectF
 import sys
@@ -13,21 +14,30 @@ import json
 import time
 import math
 from std_msgs.msg import *
-from middleman.msg import Robot
+from middleman.msg import Robot, RobotArr
+from sensor_msgs.msg import Image
 rospack = rospkg.RosPack()
 designerFile = rospack.get_path('operatorUI')+"/src/OperatorUI.ui"
 map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital"
 
 class OperatorUI(QtWidgets.QMainWindow):
+    robotUpdateSignal = pyqtSignal('PyQt_PyObject')
+    mainCamUpdateSignal = pyqtSignal('PyQt_PyObject')
+
     def __init__(self, width, height):
         super(OperatorUI, self).__init__()
         self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
         self.fitToScreen(width, height)
         self.numAnimationSteps = 20
-        self.scaleFactor = 1.5 * self.OperatorMap.width() / 1500  # the map was designed for a 1500 pixel square map.This adjusts for the screen size
+        self.scaleFactor = 2 * self.OperatorMap.width() / 1500  # the map was designed for a 1500 pixel square map.This adjusts for the screen size
         self.secondCameraShowing=False
         self.SecondCameraSlideInThread = SecondCameraSlideInThread(self.numAnimationSteps)
         self.SecondCameraSlideInThread.signal.connect(self.SecondCameraSlideInThreadCallback)
+        self.RobotShapes = []
+        self.RobotNames = []
+        self.previousMapRotation = 0
+        self.robotUpdateSignal.connect(self.drawRobotCallback)
+        self.mainCamUpdateSignal.connect(self.MainCamUpdate)
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.augmentedRealityScene = QGraphicsScene()
@@ -57,6 +67,8 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.DoneHelpingBTN.clicked.connect(self.DoneHelpingBTNCallback)
         self.DoneHelpingBTN.setEnabled(False)
         self.currentRobot = None
+        self.MainCamSubscriber = rospy.Subscriber('none', Image, self.MainCamSubscriberCallback)#subscriber changes inn new robotcallback
+        self.stateSubscriber = rospy.Subscriber('/operator/robotState', RobotArr, self.robotStateCallback)
         self.newRobotSubscriber = rospy.Subscriber('/operator/new_robot', Robot, self.NewRobotCallback)
         self.requestAnotherRobotForCameraViews= rospy.Publisher('/operator/request_extra_views_from_robot', String, queue_size=10)
 
@@ -79,6 +91,8 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.currentRobot = data
         self.NameHereLBL.setText(data.name)
         self.TaskHereLBL.setText(data.currentTaskName)
+        self.MainCamSubscriber.unregister()
+        self.MainCamSubscriber = rospy.Subscriber("/"+data.name+"/main_cam/color/image_raw", Image, self.MainCamSubscriberCallback)
 
 
     def loadMap(self, mapLocation):
@@ -104,7 +118,85 @@ class OperatorUI(QtWidgets.QMainWindow):
                 label.setRotation(item["rotation"])
                 self.scene.addItem(label)
         self.OperatorMap.scale(self.scaleFactor, self.scaleFactor)
-        #self.OperatorMap.rotate(45)#will change this later to rotate with the robot
+
+    def robotStateCallback(self, message):
+        #print("MSG received")
+        self.robotUpdateSignal.emit(message)
+
+    def drawRobotCallback(self, result):
+        for item in self.RobotShapes:
+            self.scene.removeItem(item)
+        self.RobotShapes.clear()
+        self.RobotNames.clear()
+        for item in result.robots:
+            obSize = 70
+            shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
+            shape.setPen(QPen(self.black))
+            color = self.blue
+            shape.setBrush(QBrush(color, Qt.SolidPattern))
+            self.scene.addItem(shape)
+            self.RobotShapes.append(shape)
+            self.RobotNames.append(item.name)
+            label = QGraphicsTextItem(item.name)
+            label.setX(int(item.pose.pose.pose.position.x*100))
+            label.setY(-int(item.pose.pose.pose.position.y*100+obSize*1.2))
+            font = QFont("Bavaria")
+            font.setPointSize(18)
+            font.setWeight(QFont.Bold)
+            label.setDefaultTextColor(color)
+            label.setFont(font)
+            self.scene.addItem(label)
+            self.RobotShapes.append(label)
+            quat = item.pose.pose.pose.orientation
+            siny_cosp = 2 * (quat.w * quat.z + quat.x * quat.y)
+            cosy_cosp = 1 - 2 * (quat.y * quat.y + quat.z * quat.z)
+            yaw = math.atan2(siny_cosp, cosy_cosp)
+            #making the arrow
+            startArrowX = int(item.pose.pose.pose.position.x*100-math.cos(yaw)*obSize/4)
+            startArrowY = -int(item.pose.pose.pose.position.y*100-math.sin(yaw)*obSize/4)
+            endArrowX =int(item.pose.pose.pose.position.x*100+math.cos(yaw)*obSize/2-math.cos(yaw)*obSize/4)
+            endArrowY = -int(item.pose.pose.pose.position.y*100+math.sin(yaw)*obSize/2-math.sin(yaw)*obSize/4)
+            line = QGraphicsLineItem(startArrowX,
+                                     startArrowY,
+                                     endArrowX,
+                                    endArrowY)
+            line.setPen(QPen(self.black, 5))
+            self.scene.addItem(line)
+            self.RobotShapes.append(line)
+            line = QGraphicsLineItem(endArrowX,
+                                    endArrowY,
+                                     endArrowX-math.cos(3.14/4+yaw)*obSize/4,
+                                     endArrowY+math.sin(3.14/4+yaw)*obSize/4)
+
+            line.setPen(QPen(self.black, 5))
+            self.scene.addItem(line)
+            self.RobotShapes.append(line)
+            line = QGraphicsLineItem(endArrowX,
+                                    endArrowY,
+                                     endArrowX- math.cos(3.14 / 4 - yaw) * obSize / 4,
+                                     endArrowY- math.sin(3.14 / 4 - yaw) * obSize / 4)
+
+            line.setPen(QPen(self.black, 5))
+            if self.currentRobot is not None:
+                if item.name == self.currentRobot.name:
+                    self.OperatorMap.centerOn(int(item.pose.pose.pose.position.x * 100),
+                                              -int(item.pose.pose.pose.position.y * 100))
+                    deltaRotate = math.degrees(yaw)-90-self.previousMapRotation
+                    self.previousMapRotation = math.degrees(yaw)-90
+                    self.OperatorMap.rotate(deltaRotate)
+
+
+            self.scene.addItem(line)
+            self.RobotShapes.append(line)
+
+    def MainCamSubscriberCallback(self, result):
+        self.mainCamUpdateSignal.emit(result)
+
+    def MainCamUpdate(self, result):
+        image = QImage(result.data, result.width, result.height, result.step, QImage.Format_RGB888)
+        image = image.scaled(self.Camera1.width(), self.Camera1.height(), Qt.KeepAspectRatio)
+        pixmap = QPixmap.fromImage(image)
+        self.Camera1.setPixmap(pixmap)
 
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's

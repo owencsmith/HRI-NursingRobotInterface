@@ -404,7 +404,6 @@ class Middleman():
     # robot_to_update.pose = data
 
     # call the methods below in whatever loop this node uses
-    # TODO: Nick, depending on the name of the robot, add a list of robots on the left side of the GUI
     def publishRobotStates(self):
         """
         Publishes the states of the robots in the robot list tracked by the middleman to the supervisor and operator in
