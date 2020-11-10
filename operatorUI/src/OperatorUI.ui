@@ -164,6 +164,9 @@ border-style: outset;</string>
     <property name="text">
      <string>Video Feed 1</string>
     </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
    </widget>
    <widget class="QLabel" name="Camera2">
     <property name="geometry">
@@ -181,6 +184,25 @@ border-style: outset;</string>
     </property>
     <property name="text">
      <string>Video Feed 2</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
+   </widget>
+   <widget class="QGraphicsView" name="AugmentedRealityPanel">
+    <property name="geometry">
+     <rect>
+      <x>490</x>
+      <y>10</y>
+      <width>1001</width>
+      <height>601</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border-color: rgb(0, 0,0);
+border-width: 3px;
+border-style: outset;
+background-color: transparent;</string>
     </property>
    </widget>
   </widget>
