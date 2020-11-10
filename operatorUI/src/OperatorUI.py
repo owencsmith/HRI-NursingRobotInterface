@@ -46,11 +46,11 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.white = QColor(qRgb(255, 255, 255))
         self.loadMap(map)
         ##### this shape is just to test that i can draw things over the camera feed
-        shape = QGraphicsEllipseItem(0,0, 50,50)
-        shape.setPen(QPen(self.black))
-        color = self.black
-        shape.setBrush(QBrush(color, Qt.SolidPattern))
-        self.augmentedRealityScene.addItem(shape)
+        #shape = QGraphicsEllipseItem(0,0, 50,50)
+        #shape.setPen(QPen(self.black))
+        #color = self.black
+        #shape.setBrush(QBrush(color, Qt.SolidPattern))
+        #self.augmentedRealityScene.addItem(shape)
         ######
         # Middleman communication stuff
         self.doneHelpingRobotPublisher = rospy.Publisher('/operator/done_helping', String, queue_size=10)
@@ -94,7 +94,7 @@ class OperatorUI(QtWidgets.QMainWindow):
                 label.setRotation(item["rotation"])
                 self.scene.addItem(label)
         self.OperatorMap.scale(self.scaleFactor, self.scaleFactor)
-        self.OperatorMap.rotate(45)#will change this later to rotate with the robot
+        #self.OperatorMap.rotate(45)#will change this later to rotate with the robot
 
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
