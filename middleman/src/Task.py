@@ -26,5 +26,6 @@ class Task:
         taskMsg.X = self.X
         taskMsg.Y = self.Y
         taskMsg.taskPriority = self.getPriority()
+        taskMsg.variables = self.variables
 
         return taskMsg
