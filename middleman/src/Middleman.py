@@ -242,7 +242,7 @@ class Middleman():
         poseStamped.pose.position.y = Y
         poseStamped.header.frame_id = 'map'
 
-        q_orientation = quaternion_from_euler(0, 0, yaw+np.pi)
+        q_orientation = quaternion_from_euler(0, 0, yaw + np.pi)
 
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.x = q_orientation[0]
@@ -305,6 +305,19 @@ class Middleman():
         idleTaskMsg = idleTask.convertTaskToTaskMsg()
         robotThatWasHelped.currentTask = idleTaskMsg
         robotThatWasHelped.currentTaskName = idleTaskMsg.taskName
+        self.idleTask(idleTaskMsg)
+
+        # Find the robot that was helping (if any), assign it a new idle task
+        for robot in self.activeRobotDictionary.values():
+            # check for IDLE robots
+            if robot.currentTaskName == "HLP":
+                changeHelpToIdleTask = Task("IDLE", self.taskPrios["IDLE"], robot.name, 0, 0, " ")
+                changeHelpToIdleTaskMsg = changeHelpToIdleTask.convertTaskToTaskMsg()
+                robot.currentTask = changeHelpToIdleTaskMsg
+                robot.currentTaskName = idleTaskMsg.taskName
+                robot.status = "OK"
+                self.idleTask(changeHelpToIdleTaskMsg)
+                break
 
         if len(self.robotsForOperator) > 0:
             robotToHelp = self.robotsForOperator.pop()
@@ -330,11 +343,11 @@ class Middleman():
         quat_list = [robotToNavigateToOrient.x, robotToNavigateToOrient.y, robotToNavigateToOrient.z, robotToNavigateToOrient.w]
         robotEuler = euler_from_quaternion(quat_list)
         robYaw = robotEuler[2]
-        xBuffer = np.sin(robYaw)*1.5
-        yBuffer = np.cos(robYaw)*1.5
+        xBuffer = np.sin(robYaw)*1
+        yBuffer = np.cos(robYaw)*1
         #print(robotEuler)
-        robotToNavigateToX = robotToNavigateToPose.x + xBuffer
-        robotToNavigateToY = robotToNavigateToPose.y + yBuffer
+        robotToNavigateToX = robotToNavigateToPose.x - xBuffer
+        robotToNavigateToY = robotToNavigateToPose.y - yBuffer
 
         info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + str(robYaw-np.pi/4)
 
