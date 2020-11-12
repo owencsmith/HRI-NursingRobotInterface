@@ -82,8 +82,8 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.DoneHelpingBTN.setDisabled(False)
         print(data.name)
         self.currentRobot = data
-        self.NameHereLBL.setText(data.name)
-        self.TaskHereLBL.setText(data.currentTaskName)
+        self.NameHereLBL.setText(self.currentRobot.name)
+        self.TaskHereLBL.setText(self.currentRobot.currentTask.taskName)
         self.MainCamSubscriber.unregister()
         self.MainCamSubscriber = rospy.Subscriber("/"+data.name+"/main_cam/color/image_raw", Image, self.MainCamSubscriberCallback)
 
