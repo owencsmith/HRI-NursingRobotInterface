@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Operator</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QPushButton" name="DoneHelpingBTN">
@@ -183,7 +183,7 @@ border-width: 3px;
 border-style: outset;</string>
     </property>
     <property name="text">
-     <string>Video Feed 2</string>
+     <string>Waiting For Video Feed</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignCenter</set>

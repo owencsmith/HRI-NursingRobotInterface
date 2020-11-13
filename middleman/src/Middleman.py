@@ -82,6 +82,7 @@ class Middleman():
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.taskListPublisher = rospy.Publisher('/supervisor/taskList', TaskMsgArr, queue_size=10)
         self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size=10)
+        self.TellOperatorThatRobotCameraIsAvailable = rospy.Publisher('/operator/robotForExtraCamera', String, queue_size=10)
         rospy.sleep(1)
 
         # servers
@@ -213,6 +214,7 @@ class Middleman():
         print(taskMsg.variables)
         yaw_num = float(taskMsg.variables)
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), yaw=yaw_num)
+        self.TellOperatorThatRobotCameraIsAvailable.publish(taskMsg.robotName)
 
     # do nothing
     def idleTask(self, taskMsg):

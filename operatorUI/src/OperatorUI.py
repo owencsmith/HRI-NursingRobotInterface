@@ -15,7 +15,8 @@ import time
 import math
 from std_msgs.msg import *
 from middleman.msg import Robot, RobotArr
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, LaserScan
+import numpy as np
 rospack = rospkg.RosPack()
 designerFile = rospack.get_path('operatorUI')+"/src/OperatorUI.ui"
 map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital"
@@ -23,6 +24,8 @@ map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital"
 class OperatorUI(QtWidgets.QMainWindow):
     robotUpdateSignal = pyqtSignal('PyQt_PyObject')
     mainCamUpdateSignal = pyqtSignal('PyQt_PyObject')
+    secondaryCamUpdateSignal = pyqtSignal('PyQt_PyObject')
+    LaserScanUpdateSignal = pyqtSignal('PyQt_PyObject')
 
     def __init__(self, width, height):
         super(OperatorUI, self).__init__()
@@ -36,8 +39,13 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.RobotShapes = []
         self.RobotNames = []
         self.previousMapRotation = 0
+        self.numberOfObstacleGroupings = 64
+        self.obstacleWarningDistance = 1 #in Meters
+        self.obstacleMarkerShapes = []
         self.robotUpdateSignal.connect(self.drawRobotCallback)
         self.mainCamUpdateSignal.connect(self.MainCamUpdate)
+        self.secondaryCamUpdateSignal.connect(self.SecondaryCamUpdate)
+        self.LaserScanUpdateSignal.connect(self.drawObstacleWarnings)
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.augmentedRealityScene = QGraphicsScene()
@@ -61,8 +69,11 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.DoneHelpingBTN.setEnabled(False)
         self.currentRobot = None
         self.MainCamSubscriber = rospy.Subscriber('none', Image, self.MainCamSubscriberCallback)#subscriber changes inn new robotcallback
+        self.SecondaryCamSubscriber = rospy.Subscriber('none', Image, self.SecondaryCamSubscriberCallback)
+        self.LaserScanSubscriber = rospy.Subscriber('none', LaserScan, self.LaserScanCallback)
         self.stateSubscriber = rospy.Subscriber('/operator/robotState', RobotArr, self.robotStateCallback)
         self.newRobotSubscriber = rospy.Subscriber('/operator/new_robot', Robot, self.NewRobotCallback)
+        self.robotassignedForExtraCamera = rospy.Subscriber('/operator/robotForExtraCamera', String, self.SecondaryCamRecievedCallback )
         self.requestAnotherRobotForCameraViews= rospy.Publisher('/operator/request_extra_views_from_robot', String, queue_size=10)
 
     def mapClickEventHandler(self, event):
@@ -75,8 +86,16 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.TaskHereLBL.setText("")
 
     def RequestCameraBTNCallback(self):
+        if(self.secondCameraShowing):
+            #TODO Owen and Gabe add method to call off camera robot here
+            self.SecondaryCamSubscriber.unregister()
+            self.Camera2.clear()
+            self.Camera2.setText("Waiting For Video Feed")
+            self.RequestCameraBTN.setText("Request Camera")
+        else:
+            self.RequestCameraBTN.setText("Cancel Camera")
+            self.requestAnotherRobotForCameraViews.publish(self.currentRobot.name)#if no robot is selected this makes it error out and not change bring in the second screen. a bug disguised as a feature
         self.SecondCameraSlideInThread.start()
-        self.requestAnotherRobotForCameraViews.publish(self.currentRobot.name)
         
     def NewRobotCallback(self, data):
         self.DoneHelpingBTN.setDisabled(False)
@@ -86,7 +105,8 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.TaskHereLBL.setText(self.currentRobot.currentTask.taskName)
         self.MainCamSubscriber.unregister()
         self.MainCamSubscriber = rospy.Subscriber("/"+data.name+"/main_cam/color/image_raw", Image, self.MainCamSubscriberCallback)
-
+        self.LaserScanSubscriber.unregister()
+        self.LaserScanSubscriber = rospy.Subscriber("/"+data.name+"/base_scan", LaserScan, self.LaserScanCallback)
 
     def loadMap(self, mapLocation):
         with open(mapLocation) as file:
@@ -125,7 +145,10 @@ class OperatorUI(QtWidgets.QMainWindow):
             obSize = 70
             shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
-            color = self.blue
+            color = self.yellow
+            if self.currentRobot is not None:
+                if item.name == self.currentRobot.name:
+                    color = self.blue
             shape.setBrush(QBrush(color, Qt.SolidPattern))
             self.scene.addItem(shape)
             self.RobotShapes.append(shape)
@@ -191,6 +214,58 @@ class OperatorUI(QtWidgets.QMainWindow):
         pixmap = QPixmap.fromImage(image)
         self.Camera1.setPixmap(pixmap)
 
+    def SecondaryCamSubscriberCallback(self, result):
+        self.secondaryCamUpdateSignal.emit(result)
+
+    def SecondaryCamUpdate(self, result):
+        image = QImage(result.data, result.width, result.height, result.step, QImage.Format_RGB888)
+        image = image.scaled(self.Camera2.width(), self.Camera2.height(), Qt.KeepAspectRatio)
+        pixmap = QPixmap.fromImage(image)
+        self.Camera2.setPixmap(pixmap)
+
+    def SecondaryCamRecievedCallback(self, result):
+        print("got second cam")
+        print("result")
+        self.SecondaryCamSubscriber.unregister()
+        self.SecondaryCamSubscriber = rospy.Subscriber("/" + result.data + "/main_cam/color/image_raw", Image,
+                                                  self.SecondaryCamSubscriberCallback)
+
+    def LaserScanCallback(self, result):
+        self.LaserScanUpdateSignal.emit(result)
+
+    def drawObstacleWarnings(self, result):
+        for item in self.obstacleMarkerShapes:
+            self.augmentedRealityScene.removeItem(item)
+        self.obstacleMarkerShapes.clear()
+        shape0 = QGraphicsEllipseItem(-self.AugmentedRealityPanel.height()/2,
+                                     -self.AugmentedRealityPanel.height()/2, self.AugmentedRealityPanel.height(), self.AugmentedRealityPanel.height())
+        shape0.setPen(QPen(self.black))
+        shape0.setOpacity(0.01)
+        self.augmentedRealityScene.addItem(shape0)
+        self.obstacleMarkerShapes.append(shape0)
+        markersToShow = np.zeros(self.numberOfObstacleGroupings)
+        startAngle = result.angle_min
+        angleIncrement = result.angle_increment
+        AngleCutOff = 2 * np.pi / self.numberOfObstacleGroupings
+        offset = np.pi/2
+        for point in range(0, len(result.ranges)):
+            if result.ranges[point]<=self.obstacleWarningDistance:
+                angle = startAngle + angleIncrement*point
+                directionSector = int(angle/AngleCutOff)
+                markersToShow[directionSector]=1
+        for marker in range(0, self.numberOfObstacleGroupings):
+            if(markersToShow[marker]):
+                shape = QGraphicsLineItem(-self.AugmentedRealityPanel.height()*0.98/2*math.cos(marker*AngleCutOff+offset),-self.AugmentedRealityPanel.height()*0.98/2*math.sin(marker*AngleCutOff+offset), -self.AugmentedRealityPanel.height()*0.98/2*math.cos((marker+1)*AngleCutOff+offset),-self.AugmentedRealityPanel.height()*0.98/2*math.sin((marker+1)*AngleCutOff+offset))
+                shape.setPen(QPen(self.red, 5))
+                #color = self.red
+                #if self.currentRobot is not None:
+                #    if item.name == self.currentRobot.name:
+                #        color = self.blue
+                #shape.setBrush(QBrush(color, Qt.SolidPattern))
+                self.augmentedRealityScene.addItem(shape)
+                self.obstacleMarkerShapes.append(shape)
+
+
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
         #aspect ratio
@@ -208,6 +283,8 @@ class OperatorUI(QtWidgets.QMainWindow):
         robotDescWidth = self.windowWidth*0.2
         self.OperatorMap.move(0, 0)
         self.OperatorMap.resize(robotDescWidth, self.windowHeight*0.6)
+        self.OperatorMap.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.OperatorMap.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         ######## Description frame
         self.RobotDescriptionFrame.move(0, self.windowHeight*0.9-robotDescHeight)
         self.RobotDescriptionFrame.resize(robotDescWidth, robotDescHeight)
