@@ -325,13 +325,14 @@ class SupervisorUI(QtWidgets.QMainWindow):
             else:
                 self.taskPublisher.publish(self.RobotTasksToCode[
                                                self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
-                    self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]))
+                    self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " + str(self.raisePriorityBox.isChecked()))
                 if self.LocationPicked:
                     for item in self.LocationTargetShapes:
                         self.scene.removeItem(item)
                 self.ErrorLBL.hide()
                 self.populateTaskComboBox()
                 self.taskComboBoxChanged()
+                self.raisePriorityBox.setChecked(False)
                 self.SelectRobot.clear()
                 self.SelectRobot.addItem("unassigned")
                 for item in self.RobotNames:
@@ -340,13 +341,15 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.YLocLabel.setText("Y:")
                 self.LocationPicked = False
         else:
-            self.taskPublisher.publish(self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " + str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]))
+            self.taskPublisher.publish(self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " +
+                                       str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) +  + " " + str(self.raisePriorityBox.isChecked()))
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
                     self.scene.removeItem(item)
             self.ErrorLBL.hide()
             self.populateTaskComboBox()
             self.taskComboBoxChanged()
+            self.raisePriorityBox.setChecked(False)
             self.SelectRobot.clear()
             self.SelectRobot.addItem("unassigned")
             for item in self.RobotNames:
