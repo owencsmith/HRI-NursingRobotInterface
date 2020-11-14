@@ -40,8 +40,18 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.RobotNames = []
         self.previousMapRotation = 0
         self.numberOfObstacleGroupings = 64
-        self.obstacleWarningDistance = 1 #in Meters
+        self.obstacleWarningDistance = 1.0 #in Meters
         self.obstacleMarkerShapes = []
+        self.obstacleWarningDistanceSLDR.setMinimum(1)
+        self.obstacleWarningDistanceSLDR.setMaximum(20)
+        self.obstacleWarningDistanceSLDR.valueChanged.connect(self.updateObstacleDistanceLBL)
+        self.obstacleWarningDistanceSLDR.setValue(self.obstacleWarningDistance*2)
+        self.robotWarningDistance = 1.0  # in Meters
+        self.robotMarkerShapes = []
+        self.RobotWarningDistanceSLDR.setMinimum(1)
+        self.RobotWarningDistanceSLDR.setMaximum(40)
+        self.RobotWarningDistanceSLDR.valueChanged.connect(self.updateRobotDistanceLBL)
+        self.RobotWarningDistanceSLDR.setValue(self.robotWarningDistance * 2)
         self.robotUpdateSignal.connect(self.drawRobotCallback)
         self.mainCamUpdateSignal.connect(self.MainCamUpdate)
         self.secondaryCamUpdateSignal.connect(self.SecondaryCamUpdate)
@@ -53,6 +63,8 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.OperatorMap.setMouseTracking(True)
         self.OperatorMap.setScene(self.scene)
         self.RequestCameraBTN.clicked.connect(self.RequestCameraBTNCallback)
+        self.ObstacleWarningCB.setChecked(True)
+        self.RobotWarningCB.setChecked(True)
         self.black = QColor(qRgb(0, 0, 0))
         self.blue = QColor(qRgb(30, 144, 255))
         self.red = QColor(qRgb(220, 20, 60))
@@ -141,8 +153,9 @@ class OperatorUI(QtWidgets.QMainWindow):
             self.scene.removeItem(item)
         self.RobotShapes.clear()
         self.RobotNames.clear()
+        frameRotation = 0
+        obSize = 70
         for item in result.robots:
-            obSize = 70
             shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
             color = self.yellow
@@ -153,16 +166,6 @@ class OperatorUI(QtWidgets.QMainWindow):
             self.scene.addItem(shape)
             self.RobotShapes.append(shape)
             self.RobotNames.append(item.name)
-            label = QGraphicsTextItem(item.name)
-            label.setX(int(item.pose.pose.pose.position.x*100))
-            label.setY(-int(item.pose.pose.pose.position.y*100+obSize*1.2))
-            font = QFont("Bavaria")
-            font.setPointSize(18)
-            font.setWeight(QFont.Bold)
-            label.setDefaultTextColor(color)
-            label.setFont(font)
-            self.scene.addItem(label)
-            self.RobotShapes.append(label)
             quat = item.pose.pose.pose.orientation
             siny_cosp = 2 * (quat.w * quat.z + quat.x * quat.y)
             cosy_cosp = 1 - 2 * (quat.y * quat.y + quat.z * quat.z)
@@ -200,10 +203,29 @@ class OperatorUI(QtWidgets.QMainWindow):
                     deltaRotate = math.degrees(yaw)-90-self.previousMapRotation
                     self.previousMapRotation = math.degrees(yaw)-90
                     self.OperatorMap.rotate(deltaRotate)
+                    frameRotation = math.degrees(yaw)-90
 
 
             self.scene.addItem(line)
             self.RobotShapes.append(line)
+        #frameRotation = -135
+        for item in result.robots:
+            color = self.yellow
+            if self.currentRobot is not None:
+                if item.name == self.currentRobot.name:
+                    color = self.blue
+            label = QGraphicsTextItem(item.name)
+            label.setX(int(item.pose.pose.pose.position.x * 100 + obSize * 1.1*math.cos(math.radians(-frameRotation-45))))
+            label.setY(int(-item.pose.pose.pose.position.y * 100 + obSize * 1.1*math.sin(math.radians(-frameRotation-45))))
+            #print(-frameRotation)
+            label.setRotation(-frameRotation)
+            font = QFont("Bavaria")
+            font.setPointSize(18)
+            font.setWeight(QFont.Bold)
+            label.setDefaultTextColor(color)
+            label.setFont(font)
+            self.scene.addItem(label)
+            self.RobotShapes.append(label)
 
     def MainCamSubscriberCallback(self, result):
         self.mainCamUpdateSignal.emit(result)
@@ -237,34 +259,37 @@ class OperatorUI(QtWidgets.QMainWindow):
         for item in self.obstacleMarkerShapes:
             self.augmentedRealityScene.removeItem(item)
         self.obstacleMarkerShapes.clear()
-        shape0 = QGraphicsEllipseItem(-self.AugmentedRealityPanel.height()/2,
-                                     -self.AugmentedRealityPanel.height()/2, self.AugmentedRealityPanel.height(), self.AugmentedRealityPanel.height())
-        shape0.setPen(QPen(self.black))
-        shape0.setOpacity(0.01)
-        self.augmentedRealityScene.addItem(shape0)
-        self.obstacleMarkerShapes.append(shape0)
-        markersToShow = np.zeros(self.numberOfObstacleGroupings)
-        startAngle = result.angle_min
-        angleIncrement = result.angle_increment
-        AngleCutOff = 2 * np.pi / self.numberOfObstacleGroupings
-        offset = np.pi/2
-        for point in range(0, len(result.ranges)):
-            if result.ranges[point]<=self.obstacleWarningDistance:
-                angle = startAngle + angleIncrement*point
-                directionSector = int(angle/AngleCutOff)
-                markersToShow[directionSector]=1
-        for marker in range(0, self.numberOfObstacleGroupings):
-            if(markersToShow[marker]):
-                shape = QGraphicsLineItem(-self.AugmentedRealityPanel.height()*0.98/2*math.cos(marker*AngleCutOff+offset),-self.AugmentedRealityPanel.height()*0.98/2*math.sin(marker*AngleCutOff+offset), -self.AugmentedRealityPanel.height()*0.98/2*math.cos((marker+1)*AngleCutOff+offset),-self.AugmentedRealityPanel.height()*0.98/2*math.sin((marker+1)*AngleCutOff+offset))
-                shape.setPen(QPen(self.red, 5))
-                #color = self.red
-                #if self.currentRobot is not None:
-                #    if item.name == self.currentRobot.name:
-                #        color = self.blue
-                #shape.setBrush(QBrush(color, Qt.SolidPattern))
-                self.augmentedRealityScene.addItem(shape)
-                self.obstacleMarkerShapes.append(shape)
+        if (self.ObstacleWarningCB.isChecked()):
+            shape0 = QGraphicsEllipseItem(-self.AugmentedRealityPanel.height()/2,
+                                         -self.AugmentedRealityPanel.height()/2, self.AugmentedRealityPanel.height(), self.AugmentedRealityPanel.height())
+            shape0.setPen(QPen(self.black))
+            shape0.setOpacity(0.01)
+            self.augmentedRealityScene.addItem(shape0)
+            self.obstacleMarkerShapes.append(shape0)
+            markersToShow = np.zeros(self.numberOfObstacleGroupings)
+            startAngle = result.angle_min
+            angleIncrement = result.angle_increment
+            AngleCutOff = 2 * np.pi / self.numberOfObstacleGroupings
+            offset = np.pi/2
+            for point in range(0, len(result.ranges)):
+                if result.ranges[point]<=self.obstacleWarningDistance:
+                    angle = startAngle + angleIncrement*point
+                    directionSector = int(angle/AngleCutOff)
+                    markersToShow[directionSector]=1
+            for marker in range(0, self.numberOfObstacleGroupings):
+                if(markersToShow[marker]):
+                    shape = QGraphicsLineItem(-self.AugmentedRealityPanel.height()*0.98/2*math.cos(marker*AngleCutOff+offset),-self.AugmentedRealityPanel.height()*0.98/2*math.sin(marker*AngleCutOff+offset), -self.AugmentedRealityPanel.height()*0.98/2*math.cos((marker+1)*AngleCutOff+offset),-self.AugmentedRealityPanel.height()*0.98/2*math.sin((marker+1)*AngleCutOff+offset))
+                    shape.setPen(QPen(self.red, 5))
+                    self.augmentedRealityScene.addItem(shape)
+                    self.obstacleMarkerShapes.append(shape)
 
+    def updateObstacleDistanceLBL(self):
+        self.obstacleWarningDistance = self.obstacleWarningDistanceSLDR.value()/2
+        self.ObstacleWarningDistanceLBL.setText(str(self.obstacleWarningDistance) + " M")
+
+    def updateRobotDistanceLBL(self):
+        self.robotWarningDistance = self.RobotWarningDistanceSLDR.value() / 2
+        self.RobotWarningDistanceLBL.setText(str(self.robotWarningDistance) + " M")
 
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
@@ -296,10 +321,24 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.TaskLBL.resize(robotDescWidth*0.4, robotDescHeight*0.1)
         self.TaskHereLBL.move(robotDescWidth*0.4, robotDescHeight*0.1)
         self.TaskHereLBL.resize(robotDescWidth*0.6, robotDescHeight*0.1)
-        self.ProblemLBL.move(0, robotDescHeight*0.2)
-        self.ProblemLBL.resize(robotDescWidth*0.4, robotDescHeight*0.1)
-        self.ProblemHereLBL.move(robotDescWidth*0.4, robotDescHeight*0.2)
-        self.ProblemHereLBL.resize(robotDescWidth*0.6, robotDescHeight*0.1)
+        self.obstacleWarningDistanceLBL.move(0, robotDescHeight*0.2)
+        self.obstacleWarningDistanceLBL.resize(robotDescWidth, robotDescHeight*0.1)
+        self.obstacleWarningDistanceSLDR.move(robotDescWidth*0.01, robotDescHeight*0.3)
+        self.obstacleWarningDistanceSLDR.resize(robotDescWidth*0.4, robotDescHeight*0.1)
+        self.ObstacleWarningDistanceLBL.move(robotDescWidth*0.42, robotDescHeight*0.3)
+        self.ObstacleWarningDistanceLBL.resize(robotDescWidth*0.2, robotDescHeight*0.1)
+        self.ObstacleWarningCB.move(robotDescWidth*0.63, robotDescHeight*0.3)
+        self.ObstacleWarningCB.resize(robotDescWidth*0.36, robotDescHeight*0.1)
+
+        self.RobotWarningDistanceTitleLBL.move(0, robotDescHeight * 0.4)
+        self.RobotWarningDistanceTitleLBL.resize(robotDescWidth, robotDescHeight * 0.1)
+        self.RobotWarningDistanceSLDR.move(robotDescWidth * 0.01, robotDescHeight * 0.5)
+        self.RobotWarningDistanceSLDR.resize(robotDescWidth * 0.4, robotDescHeight * 0.1)
+        self.RobotWarningDistanceLBL.move(robotDescWidth * 0.42, robotDescHeight * 0.5)
+        self.RobotWarningDistanceLBL.resize(robotDescWidth * 0.2, robotDescHeight * 0.1)
+        self.RobotWarningCB.move(robotDescWidth * 0.63, robotDescHeight * 0.5)
+        self.RobotWarningCB.resize(robotDescWidth * 0.36, robotDescHeight * 0.1)
+
         ######################################################################
         self.RequestCameraBTN.move(0, self.windowHeight*0.95)
         self.RequestCameraBTN.resize(robotDescWidth, self.windowHeight*0.05)
