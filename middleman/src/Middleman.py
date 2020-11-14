@@ -112,19 +112,24 @@ class Middleman():
         taskName = dataList[0]
         # passed as unassigned if task is not assigned
         robotName = dataList[1]
+        if(dataList[4] == "False"):
+            priorityRaised = False
+        else:
+            priorityRaised = True
         print('Split Task Data')
+        print("PRIORITY RAISED: ", priorityRaised)
         print(len(dataList))
         print(dataList)
 
-        if len(dataList) > 4:
-            variables = dataList[4]
+        if len(dataList) > 5:
+            variables = dataList[5]
         else:
             variables = " "
 
         if (taskName != 'SOS'):
             X = float(dataList[2])
             Y = float(dataList[3])
-            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, variables) # help task has yaw here
+            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, priorityRaised, variables) # help task has yaw here
             newTaskMsg = newTask.convertTaskToTaskMsg()
             if robotName != "unassigned":
                 # remove current task form active task list
@@ -303,7 +308,7 @@ class Middleman():
         robotThatWasHelped = self.activeRobotDictionary[robotName]
         # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
-        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, " ")
+        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, False, " ")
         idleTaskMsg = idleTask.convertTaskToTaskMsg()
         robotThatWasHelped.currentTask = idleTaskMsg
         robotThatWasHelped.currentTaskName = idleTaskMsg.taskName
@@ -313,7 +318,7 @@ class Middleman():
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
             if robot.currentTaskName == "HLP":
-                changeHelpToIdleTask = Task("IDLE", self.taskPrios["IDLE"], robot.name, 0, 0, " ")
+                changeHelpToIdleTask = Task("IDLE", self.taskPrios["IDLE"], robot.name, 0, 0, False, " ")
                 changeHelpToIdleTaskMsg = changeHelpToIdleTask.convertTaskToTaskMsg()
                 robot.currentTask = changeHelpToIdleTaskMsg
                 robot.currentTaskName = idleTaskMsg.taskName
@@ -351,7 +356,7 @@ class Middleman():
         robotToNavigateToX = robotToNavigateToPose.x - xBuffer
         robotToNavigateToY = robotToNavigateToPose.y - yBuffer
 
-        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + str(robYaw-np.pi/4)
+        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + 'False' + ' ' + str(robYaw-np.pi/4)
 
         print(info_str)
         self.processTask(info_str)
@@ -406,7 +411,7 @@ class Middleman():
         newRobot.name = data.data
         newRobot.status = "OK"
 
-        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, " ")
+        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, False, " ")
         initialTaskMsg = initialTask.convertTaskToTaskMsg()
         newRobot.currentTaskName = initialTaskMsg.taskName
         newRobot.currentTask = initialTaskMsg
@@ -515,31 +520,32 @@ class Middleman():
                 highestPriorityTask = self.taskPriorityQueue[-1]
                 self.activeTaskList.sort(key=lambda task: task.getPriority())
                 lowestPriorityTask = self.activeTaskList[0]
-                if highestPriorityTask.getPriority() > lowestPriorityTask.getPriority():
-                    print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(
-                        highestPriorityTask.getPriority()))
-                    swappedTasks = TaskMsgArr()
-                    # swap the active task with high  [Active, High Priority]
-                    swappedTasks.taskMsgs.append(lowestPriorityTask.convertTaskToTaskMsg())
-                    swappedTasks.taskMsgs.append(highestPriorityTask.convertTaskToTaskMsg())
-                    self.taskReassignmentPublisher.publish(swappedTasks)
-                    # remove from priority queue
-                    self.taskPriorityQueue.pop()
-                    # reassign robot name
-                    highestPriorityTask.robotName = lowestPriorityTask.robotName
-                    # add new task to active
-                    self.activeTaskList.append(highestPriorityTask)
-                    self.taskFns[highestPriorityTask.taskName](highestPriorityTask)  # call task function
+                if(lowestPriorityTask.taskName != "IDLE"):
+                    if highestPriorityTask.getPriority() > lowestPriorityTask.getPriority():
+                        print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(
+                            highestPriorityTask.getPriority()))
+                        swappedTasks = TaskMsgArr()
+                        # swap the active task with high  [Active, High Priority]
+                        swappedTasks.taskMsgs.append(lowestPriorityTask.convertTaskToTaskMsg())
+                        swappedTasks.taskMsgs.append(highestPriorityTask.convertTaskToTaskMsg())
+                        self.taskReassignmentPublisher.publish(swappedTasks)
+                        # remove from priority queue
+                        self.taskPriorityQueue.pop()
+                        # reassign robot name
+                        highestPriorityTask.robotName = lowestPriorityTask.robotName
+                        # add new task to active
+                        self.activeTaskList.append(highestPriorityTask)
+                        self.taskFns[highestPriorityTask.taskName](highestPriorityTask)  # call task function
 
-                    # remove now inactive from activeList
-                    self.activeTaskList.remove(lowestPriorityTask)
-                    robotBeingReassigned = self.activeRobotDictionary[lowestPriorityTask.robotName]
-                    robotBeingReassigned.currentTask = highestPriorityTask.convertTaskToTaskMsg()
-                    robotBeingReassigned.currentTaskName = highestPriorityTask.taskName
-                    # reassign active task to unassigned status
-                    lowestPriorityTask.robotName = 'unassigned'
-                    # add previously active task to priority queue
-                    self.taskPriorityQueue.append(lowestPriorityTask)
+                        # remove now inactive from activeList
+                        self.activeTaskList.remove(lowestPriorityTask)
+                        robotBeingReassigned = self.activeRobotDictionary[lowestPriorityTask.robotName]
+                        robotBeingReassigned.currentTask = highestPriorityTask.convertTaskToTaskMsg()
+                        robotBeingReassigned.currentTaskName = highestPriorityTask.taskName
+                        # reassign active task to unassigned status
+                        lowestPriorityTask.robotName = 'unassigned'
+                        # add previously active task to priority queue
+                        self.taskPriorityQueue.append(lowestPriorityTask)
 
                 self.reassignmentCounter = time.time()
 

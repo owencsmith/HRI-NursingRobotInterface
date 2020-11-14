@@ -5,3 +5,4 @@ float64 Y
 float64 taskPriority
 string robotName
 string variables
+bool isRaisedPriority
