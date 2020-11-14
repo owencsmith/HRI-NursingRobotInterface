@@ -38,6 +38,7 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.SecondCameraSlideInThread.signal.connect(self.SecondCameraSlideInThreadCallback)
         self.RobotShapes = []
         self.RobotNames = []
+        self.RoomNames = []
         self.previousMapRotation = 0
         self.numberOfObstacleGroupings = 64
         self.obstacleWarningDistance = 1.0 #in Meters
@@ -140,7 +141,9 @@ class OperatorUI(QtWidgets.QMainWindow):
                 font.setPointSize(24)
                 font.setWeight(QFont.Bold)
                 label.setFont(font)
+                label.setTransformOriginPoint(QPoint(item["length"] / 2, item["width"]/2))
                 label.setRotation(item["rotation"])
+                self.RoomNames.append(label)
                 self.scene.addItem(label)
         self.OperatorMap.scale(self.scaleFactor, self.scaleFactor)
 
@@ -208,7 +211,6 @@ class OperatorUI(QtWidgets.QMainWindow):
 
             self.scene.addItem(line)
             self.RobotShapes.append(line)
-        #frameRotation = -135
         for item in result.robots:
             color = self.yellow
             if self.currentRobot is not None:
@@ -217,7 +219,6 @@ class OperatorUI(QtWidgets.QMainWindow):
             label = QGraphicsTextItem(item.name)
             label.setX(int(item.pose.pose.pose.position.x * 100 + obSize * 1.1*math.cos(math.radians(-frameRotation-45))))
             label.setY(int(-item.pose.pose.pose.position.y * 100 + obSize * 1.1*math.sin(math.radians(-frameRotation-45))))
-            #print(-frameRotation)
             label.setRotation(-frameRotation)
             font = QFont("Bavaria")
             font.setPointSize(18)
@@ -226,6 +227,8 @@ class OperatorUI(QtWidgets.QMainWindow):
             label.setFont(font)
             self.scene.addItem(label)
             self.RobotShapes.append(label)
+        for item in self.RoomNames:
+            item.setRotation(-frameRotation)
 
     def MainCamSubscriberCallback(self, result):
         self.mainCamUpdateSignal.emit(result)
