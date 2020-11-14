@@ -5,8 +5,10 @@ import rospy
 from std_msgs.msg import *
 from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from middleman.srv import TaskString, TaskStringResponse
 from Task import *
+import numpy as np
 
 
 # TODO: Use the name of the robot to determine all the topics for that specific robot since they are all the same
@@ -80,6 +82,7 @@ class Middleman():
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.taskListPublisher = rospy.Publisher('/supervisor/taskList', TaskMsgArr, queue_size=10)
         self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size=10)
+        self.TellOperatorThatRobotCameraIsAvailable = rospy.Publisher('/operator/robotForExtraCamera', String, queue_size=10)
         rospy.sleep(1)
 
         # servers
@@ -110,15 +113,18 @@ class Middleman():
         # passed as unassigned if task is not assigned
         robotName = dataList[1]
         print('Split Task Data')
+        print(len(dataList))
+        print(dataList)
 
         if len(dataList) > 4:
-            variables = dataList[4:]
+            variables = dataList[4]
         else:
-            variables = None
+            variables = " "
+
         if (taskName != 'SOS'):
             X = float(dataList[2])
             Y = float(dataList[3])
-            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, variables)
+            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, variables) # help task has yaw here
             newTaskMsg = newTask.convertTaskToTaskMsg()
             if robotName != "unassigned":
                 # remove current task form active task list
@@ -205,7 +211,10 @@ class Middleman():
         currentRobot.status = 'OPC'
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
-        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
+        print(taskMsg.variables)
+        yaw_num = float(taskMsg.variables)
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), yaw=yaw_num)
+        self.TellOperatorThatRobotCameraIsAvailable.publish(taskMsg.robotName)
 
     # do nothing
     def idleTask(self, taskMsg):
@@ -221,7 +230,7 @@ class Middleman():
         self.sendRobotToPos(currentRobot, float(currentRobot.pose.pose.pose.position.x),
                             float(currentRobot.pose.pose.pose.position.y))
 
-    def sendRobotToPos(self, currentRobot, X, Y):
+    def sendRobotToPos(self, currentRobot, X, Y, yaw=0):
         """
         Given a robot and a location, sends the robot to that location by publishing to
         'robot_namespace'/move_base_simple/goal
@@ -234,9 +243,14 @@ class Middleman():
         poseStamped.pose.position.x = X
         poseStamped.pose.position.y = Y
         poseStamped.header.frame_id = 'map'
+
+        q_orientation = quaternion_from_euler(0, 0, yaw + np.pi)
+
         # arbitrary orientation for nav goal because operator/automation will take over
-        poseStamped.pose.orientation.w = 1
-        poseStamped.pose.orientation.z = .16
+        poseStamped.pose.orientation.x = q_orientation[0]
+        poseStamped.pose.orientation.y = q_orientation[1]
+        poseStamped.pose.orientation.w = q_orientation[2]
+        poseStamped.pose.orientation.z = q_orientation[3]
         topic = ''
         if currentRobot.name == 'trina2':
             topic = '/move_base_simple/goal'
@@ -289,10 +303,23 @@ class Middleman():
         robotThatWasHelped = self.activeRobotDictionary[robotName]
         # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
-        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, None)
+        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, " ")
         idleTaskMsg = idleTask.convertTaskToTaskMsg()
         robotThatWasHelped.currentTask = idleTaskMsg
         robotThatWasHelped.currentTaskName = idleTaskMsg.taskName
+        self.idleTask(idleTaskMsg)
+
+        # Find the robot that was helping (if any), assign it a new idle task
+        for robot in self.activeRobotDictionary.values():
+            # check for IDLE robots
+            if robot.currentTaskName == "HLP":
+                changeHelpToIdleTask = Task("IDLE", self.taskPrios["IDLE"], robot.name, 0, 0, " ")
+                changeHelpToIdleTaskMsg = changeHelpToIdleTask.convertTaskToTaskMsg()
+                robot.currentTask = changeHelpToIdleTaskMsg
+                robot.currentTaskName = idleTaskMsg.taskName
+                robot.status = "OK"
+                self.idleTask(changeHelpToIdleTaskMsg)
+                break
 
         if len(self.robotsForOperator) > 0:
             robotToHelp = self.robotsForOperator.pop()
@@ -313,12 +340,20 @@ class Middleman():
         # Is there an IDLE robot that CAN be used?
         robotToNavigateTo = self.activeRobotDictionary[data.data.split()[0]]
         # grab the pose of the robot to navigate to
-        robotToNavigateToPose = robotToNavigateTo.pose
-        buffer = 0.5
-        robotToNavigateToX = robotToNavigateToPose.pose.pose.position.x + buffer
-        robotToNavigateToY = robotToNavigateToPose.pose.pose.position.y + buffer
+        robotToNavigateToPose = robotToNavigateTo.pose.pose.pose.position
+        robotToNavigateToOrient = robotToNavigateTo.pose.pose.pose.orientation
+        quat_list = [robotToNavigateToOrient.x, robotToNavigateToOrient.y, robotToNavigateToOrient.z, robotToNavigateToOrient.w]
+        robotEuler = euler_from_quaternion(quat_list)
+        robYaw = robotEuler[2]
+        xBuffer = np.sin(robYaw)*1
+        yBuffer = np.cos(robYaw)*1
+        #print(robotEuler)
+        robotToNavigateToX = robotToNavigateToPose.x - xBuffer
+        robotToNavigateToY = robotToNavigateToPose.y - yBuffer
 
-        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY)
+        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + str(robYaw-np.pi/4)
+
+        print(info_str)
         self.processTask(info_str)
         # # parse the string for the robot to navigate to for more views
         # helpTask = Task("HLP", self.taskPrios["HLP"], robotThatWillHelp.name, robotToNavigateToX, robotToNavigateToY, None)
@@ -371,7 +406,7 @@ class Middleman():
         newRobot.name = data.data
         newRobot.status = "OK"
 
-        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, None)
+        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, " ")
         initialTaskMsg = initialTask.convertTaskToTaskMsg()
         newRobot.currentTaskName = initialTaskMsg.taskName
         newRobot.currentTask = initialTaskMsg
@@ -419,6 +454,7 @@ class Middleman():
             except:
                 pass
             robotList.robots.append(robot)
+            #print(type(robot.currentTask.variables))
 
         self.statePublisherForOperator.publish(robotList)
         self.statePublisherForSupervisor.publish(robotList)
