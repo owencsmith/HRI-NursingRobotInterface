@@ -78,6 +78,7 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.loadMap(map)
         # Middleman communication stuff
         self.doneHelpingRobotPublisher = rospy.Publisher('/operator/done_helping', String, queue_size=10)
+        self.releaseCameraPublisher = rospy.Publisher('/operator/release_help_robot', String, queue_size=10)
         self.DoneHelpingBTN.clicked.connect(self.DoneHelpingBTNCallback)
         self.DoneHelpingBTN.setEnabled(False)
         self.currentRobot = None
@@ -114,6 +115,7 @@ class OperatorUI(QtWidgets.QMainWindow):
     def RequestCameraBTNCallback(self):
         if(self.secondCameraShowing):
             #TODO Owen and Gabe add method to call off camera robot here
+            self.releaseCameraPublisher.publish('Begone Thot')
             self.helperRobot = None
             self.SecondaryCamSubscriber.unregister()
             self.Camera2.clear()

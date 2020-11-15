@@ -70,6 +70,7 @@ class Middleman():
         rospy.Subscriber("/robot/stuck", String, self.passRobotToQueueForOperator)
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
+        rospy.Subscriber("/operator/release_help_robot", String, self.releaseFromHelp)
         rospy.sleep(1)
 
         # publishers
@@ -321,7 +322,7 @@ class Middleman():
                 changeHelpToIdleTask = Task("IDLE", self.taskPrios["IDLE"], robot.name, 0, 0, False, " ")
                 changeHelpToIdleTaskMsg = changeHelpToIdleTask.convertTaskToTaskMsg()
                 robot.currentTask = changeHelpToIdleTaskMsg
-                robot.currentTaskName = idleTaskMsg.taskName
+                robot.currentTaskName = changeHelpToIdleTaskMsg.taskName
                 robot.status = "OK"
                 self.idleTask(changeHelpToIdleTaskMsg)
                 break
@@ -331,6 +332,19 @@ class Middleman():
             print("Sending new robot: ", robotToHelp.name, " ,to operator.")
             self.sendNewRobotToOperator.publish(robotToHelp)
             self.operatorIsBusy = True
+
+    def releaseFromHelp(self, data):
+        # Find the robot that was helping (if any), assign it a new idle task
+        for robot in self.activeRobotDictionary.values():
+            # check for IDLE robots
+            if robot.currentTaskName == "HLP":
+                changeHelpToIdleTask = Task("IDLE", self.taskPrios["IDLE"], robot.name, 0, 0, False, " ")
+                changeHelpToIdleTaskMsg = changeHelpToIdleTask.convertTaskToTaskMsg()
+                robot.currentTask = changeHelpToIdleTaskMsg
+                robot.currentTaskName = changeHelpToIdleTaskMsg.taskName
+                robot.status = "OK"
+                self.idleTask(changeHelpToIdleTaskMsg)
+                break
 
     # TODO: add help task to the priority queue or active queue
     def sendAnotherRobotForCameraViews(self, data):
