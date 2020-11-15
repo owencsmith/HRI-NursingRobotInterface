@@ -118,7 +118,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.RobotListTable.setColumnCount(3)
         self.RobotListTable.setHorizontalHeaderLabels(('Robot ID', 'Task', 'Status'))
         self.RobotListTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-
         self.PriorityQueueTable.setColumnCount(3)
         self.PriorityQueueTable.setHorizontalHeaderLabels(('Task', 'ID', 'Priority'))
         self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -127,14 +126,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
 
     def loadMap(self, mapLocation):
-        #These shapes just help make the viewport more centered since it autocenters around the bounding box of the map objects
-        #shape0 = QGraphicsRectItem(-1500, -1000, 1, 1)
-        #shape0.setPen(self.white)
-        #self.scene.addItem(shape0)
-        #shape1 = QGraphicsRectItem(1500, 1500, 1, 1)
-        #shape1.setPen(self.white)
-        #self.scene.addItem(shape1)
-        #########################################################
         with open(mapLocation) as file:
             mapObjList = json.load(file)
         for item in mapObjList["objects"]:
@@ -262,7 +253,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.RobotTasks = {}
         self.RobotTasksToCode = {}
         getTasksFromMiddleMan = rospy.ServiceProxy('/supervisor/taskCodes', TaskString)
-        response = getTasksFromMiddleMan("YOOOOO")
+        response = getTasksFromMiddleMan("Wumpus")
         for item in response.tasks:
             taskInfo = item.split()
             self.RobotTasks[taskInfo[0]] = (taskInfo[1], taskInfo[2], taskInfo[3])
@@ -342,7 +333,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.LocationPicked = False
         else:
             self.taskPublisher.publish(self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " +
-                                       str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) +  + " " + str(self.raisePriorityBox.isChecked()))
+                                       str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) +  " " + str(self.raisePriorityBox.isChecked()))
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
                     self.scene.removeItem(item)
@@ -419,7 +410,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SelectTaskLabel.move(self.slideInMenuWidth*0.05, self.windowHeight*0.05)
         self.SelectTaskLabel.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.02)
         self.SelectTaskCB.move(self.slideInMenuWidth*0.05, self.windowHeight*0.07)
-        self.SelectTaskCB.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.03)
+        self.SelectTaskCB.resize(self.slideInMenuWidth * 0.45, self.windowHeight * 0.03)
+        self.raisePriorityBox.move(self.slideInMenuWidth*0.55, self.windowHeight*0.07)
+        self.raisePriorityBox.resize(self.slideInMenuWidth * 0.4, self.windowHeight * 0.03)
 
         self.AssignedRobotTXTLabel.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.11)
         self.AssignedRobotTXTLabel.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.02)
