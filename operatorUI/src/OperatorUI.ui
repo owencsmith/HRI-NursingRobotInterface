@@ -246,7 +246,7 @@ border-width: 3px;
 border-style: outset;</string>
     </property>
     <property name="text">
-     <string>Video Feed 1</string>
+     <string>Waiting For Video Feed</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignCenter</set>

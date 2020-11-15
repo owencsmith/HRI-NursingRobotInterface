@@ -81,6 +81,7 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.DoneHelpingBTN.clicked.connect(self.DoneHelpingBTNCallback)
         self.DoneHelpingBTN.setEnabled(False)
         self.currentRobot = None
+        self.helperRobot = None
         self.MainCamSubscriber = rospy.Subscriber('none', Image, self.MainCamSubscriberCallback)#subscriber changes inn new robotcallback
         self.SecondaryCamSubscriber = rospy.Subscriber('none', Image, self.SecondaryCamSubscriberCallback)
         self.LaserScanSubscriber = rospy.Subscriber('none', LaserScan, self.LaserScanCallback)
@@ -97,6 +98,18 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.DoneHelpingBTN.setEnabled(False)
         self.NameHereLBL.setText("")
         self.TaskHereLBL.setText("")
+        self.RequestCameraBTN.setEnabled(False)
+        self.currentRobot =None
+        self.helperRobot = None
+        self.MainCamSubscriber.unregister()
+        self.SecondaryCamSubscriber.unregister()
+        self.LaserScanSubscriber.unregister()
+        self.Camera1.clear()
+        self.Camera1.setText("Waiting For Video Feed")
+        if self.secondCameraShowing:
+            self.RequestCameraBTNCallback()
+        for item in self.obstacleMarkerShapes:
+            self.augmentedRealityScene.removeItem(item)
 
     def RequestCameraBTNCallback(self):
         if(self.secondCameraShowing):
@@ -112,6 +125,7 @@ class OperatorUI(QtWidgets.QMainWindow):
         
     def NewRobotCallback(self, data):
         self.DoneHelpingBTN.setDisabled(False)
+        self.RequestCameraBTN.setDisabled(False)
         print(data.name)
         self.currentRobot = data
         self.NameHereLBL.setText(self.currentRobot.name)
@@ -156,8 +170,12 @@ class OperatorUI(QtWidgets.QMainWindow):
             self.scene.removeItem(item)
         self.RobotShapes.clear()
         self.RobotNames.clear()
+        for item in self.robotMarkerShapes:
+            self.augmentedRealityScene.removeItem(item)
+        self.robotMarkerShapes.clear()
         frameRotation = 0
         obSize = 70
+        controlledRobot = None
         for item in result.robots:
             shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
@@ -165,6 +183,10 @@ class OperatorUI(QtWidgets.QMainWindow):
             if self.currentRobot is not None:
                 if item.name == self.currentRobot.name:
                     color = self.blue
+                    controlledRobot = item
+            if self.helperRobot is not None:
+                if self.helperRobot == item.name:
+                    color = self.purple
             shape.setBrush(QBrush(color, Qt.SolidPattern))
             self.scene.addItem(shape)
             self.RobotShapes.append(shape)
@@ -199,6 +221,8 @@ class OperatorUI(QtWidgets.QMainWindow):
                                      endArrowY- math.sin(3.14 / 4 - yaw) * obSize / 4)
 
             line.setPen(QPen(self.black, 5))
+            self.scene.addItem(line)
+            self.RobotShapes.append(line)
             if self.currentRobot is not None:
                 if item.name == self.currentRobot.name:
                     self.OperatorMap.centerOn(int(item.pose.pose.pose.position.x * 100),
@@ -207,15 +231,19 @@ class OperatorUI(QtWidgets.QMainWindow):
                     self.previousMapRotation = math.degrees(yaw)-90
                     self.OperatorMap.rotate(deltaRotate)
                     frameRotation = math.degrees(yaw)-90
+            else:
+                self.OperatorMap.rotate(-self.previousMapRotation)
+                self.previousMapRotation = 0
+                frameRotation = 0
 
-
-            self.scene.addItem(line)
-            self.RobotShapes.append(line)
         for item in result.robots:
             color = self.yellow
             if self.currentRobot is not None:
                 if item.name == self.currentRobot.name:
                     color = self.blue
+            if self.helperRobot is not None:
+                if self.helperRobot == item.name:
+                    color = self.purple
             label = QGraphicsTextItem(item.name)
             label.setX(int(item.pose.pose.pose.position.x * 100 + obSize * 1.1*math.cos(math.radians(-frameRotation-45))))
             label.setY(int(-item.pose.pose.pose.position.y * 100 + obSize * 1.1*math.sin(math.radians(-frameRotation-45))))
@@ -229,6 +257,50 @@ class OperatorUI(QtWidgets.QMainWindow):
             self.RobotShapes.append(label)
         for item in self.RoomNames:
             item.setRotation(-frameRotation)
+        if self.RobotWarningCB.isChecked():
+            for item in result.robots:#draw arrows to other bots
+                if controlledRobot is not None:
+                    if item.name is not controlledRobot.name:
+                        deltaX = controlledRobot.pose.pose.pose.position.x - item.pose.pose.pose.position.x
+                        deltaY = controlledRobot.pose.pose.pose.position.y - item.pose.pose.pose.position.y
+                        robotDistance = math.sqrt(
+                            math.pow(deltaX, 2)+
+                            math.pow(deltaY, 2))
+                        if robotDistance<self.robotWarningDistance:
+                            color = self.yellow
+                            if self.helperRobot is not None:
+                                if self.helperRobot == item.name:
+                                    color = self.purple
+                            quat = controlledRobot.pose.pose.pose.orientation
+                            siny_cosp = 2 * (quat.w * quat.z + quat.x * quat.y)
+                            cosy_cosp = 1 - 2 * (quat.y * quat.y + quat.z * quat.z)
+                            yaw = math.atan2(siny_cosp, cosy_cosp)
+                            difAngle = math.atan2(deltaY, deltaX)
+                            totalAngle = yaw-difAngle+math.pi/2
+                            startArrowX = int(self.AugmentedRealityPanel.height()*math.cos(totalAngle)*0.45)
+                            startArrowY = int(self.AugmentedRealityPanel.height()*math.sin(totalAngle)*0.45)
+                            endArrowX = int(self.AugmentedRealityPanel.height()*math.cos(totalAngle)*0.49)
+                            endArrowY = int(self.AugmentedRealityPanel.height()*math.sin(totalAngle)*0.49)
+                            line = QGraphicsLineItem(startArrowX, startArrowY, endArrowX,endArrowY)
+                            line.setPen(QPen(color, 10))
+                            self.augmentedRealityScene.addItem(line)
+                            self.robotMarkerShapes.append(line)
+                            line = QGraphicsLineItem(endArrowX,
+                                                     endArrowY,
+                                                     endArrowX - math.cos(3.14 / 4 + totalAngle) * self.AugmentedRealityPanel.height()*0.02,
+                                                     endArrowY - math.sin(3.14 / 4 + totalAngle) * self.AugmentedRealityPanel.height()*0.02)
+
+                            line.setPen(QPen(color, 10))
+                            self.augmentedRealityScene.addItem(line)
+                            self.robotMarkerShapes.append(line)
+                            line = QGraphicsLineItem(endArrowX,
+                                                     endArrowY,
+                                                     endArrowX - math.cos(3.14 / 4 - totalAngle) * self.AugmentedRealityPanel.height()*0.02,
+                                                     endArrowY + math.sin(3.14 / 4 - totalAngle) * self.AugmentedRealityPanel.height()*0.02)
+
+                            line.setPen(QPen(color, 10))
+                            self.augmentedRealityScene.addItem(line)
+                            self.robotMarkerShapes.append(line)
 
     def MainCamSubscriberCallback(self, result):
         self.mainCamUpdateSignal.emit(result)
@@ -251,6 +323,7 @@ class OperatorUI(QtWidgets.QMainWindow):
     def SecondaryCamRecievedCallback(self, result):
         print("got second cam")
         print("result")
+        self.helperRobot = result.data
         self.SecondaryCamSubscriber.unregister()
         self.SecondaryCamSubscriber = rospy.Subscriber("/" + result.data + "/main_cam/color/image_raw", Image,
                                                   self.SecondaryCamSubscriberCallback)
@@ -262,13 +335,14 @@ class OperatorUI(QtWidgets.QMainWindow):
         for item in self.obstacleMarkerShapes:
             self.augmentedRealityScene.removeItem(item)
         self.obstacleMarkerShapes.clear()
+        shape0 = QGraphicsEllipseItem(-self.AugmentedRealityPanel.height() / 2,
+                                      -self.AugmentedRealityPanel.height() / 2, self.AugmentedRealityPanel.height(),
+                                      self.AugmentedRealityPanel.height())
+        shape0.setPen(QPen(self.black))
+        shape0.setOpacity(0.01)
+        self.augmentedRealityScene.addItem(shape0)
+        self.obstacleMarkerShapes.append(shape0)
         if (self.ObstacleWarningCB.isChecked()):
-            shape0 = QGraphicsEllipseItem(-self.AugmentedRealityPanel.height()/2,
-                                         -self.AugmentedRealityPanel.height()/2, self.AugmentedRealityPanel.height(), self.AugmentedRealityPanel.height())
-            shape0.setPen(QPen(self.black))
-            shape0.setOpacity(0.01)
-            self.augmentedRealityScene.addItem(shape0)
-            self.obstacleMarkerShapes.append(shape0)
             markersToShow = np.zeros(self.numberOfObstacleGroupings)
             startAngle = result.angle_min
             angleIncrement = result.angle_increment
@@ -285,6 +359,7 @@ class OperatorUI(QtWidgets.QMainWindow):
                     shape.setPen(QPen(self.red, 5))
                     self.augmentedRealityScene.addItem(shape)
                     self.obstacleMarkerShapes.append(shape)
+        self.AugmentedRealityPanel.centerOn(QPoint(0, 0))
 
     def updateObstacleDistanceLBL(self):
         self.obstacleWarningDistance = self.obstacleWarningDistanceSLDR.value()/2
