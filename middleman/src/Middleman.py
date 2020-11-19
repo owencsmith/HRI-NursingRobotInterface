@@ -17,6 +17,12 @@ import numpy as np
 # TODO: We're proabbly going to have to have a topic for each of the robot joints as well.... Robot is going
 # to encapsulate a lot of information
 
+#TODO: How to do Viapoints
+    # A list of nav tasks
+    # store it in variables for nav
+         # OR send a list of nav tasks
+    #
+
 
 class Middleman():
     def __init__(self):
@@ -71,6 +77,7 @@ class Middleman():
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
         rospy.Subscriber("/operator/release_help_robot", String, self.releaseFromHelp)
+        rospy.Subscriber("/supervisor/removeTask", String, self.removeFromPriorityQueue)
         rospy.sleep(1)
 
         # publishers
@@ -319,12 +326,8 @@ class Middleman():
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
             if robot.currentTaskName == "HLP":
-                changeHelpToIdleTask = Task("IDLE", self.taskPrios["IDLE"], robot.name, 0, 0, False, " ")
-                changeHelpToIdleTaskMsg = changeHelpToIdleTask.convertTaskToTaskMsg()
-                robot.currentTask = changeHelpToIdleTaskMsg
-                robot.currentTaskName = changeHelpToIdleTaskMsg.taskName
-                robot.status = "OK"
-                self.idleTask(changeHelpToIdleTaskMsg)
+                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+                self.processTask(info_str)
                 break
 
         if len(self.robotsForOperator) > 0:
@@ -338,13 +341,17 @@ class Middleman():
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
             if robot.currentTaskName == "HLP":
-                changeHelpToIdleTask = Task("IDLE", self.taskPrios["IDLE"], robot.name, 0, 0, False, " ")
-                changeHelpToIdleTaskMsg = changeHelpToIdleTask.convertTaskToTaskMsg()
-                robot.currentTask = changeHelpToIdleTaskMsg
-                robot.currentTaskName = changeHelpToIdleTaskMsg.taskName
-                robot.status = "OK"
-                self.idleTask(changeHelpToIdleTaskMsg)
+                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+                self.processTask(info_str)
                 break
+
+    def removeFromPriorityQueue(self, data):
+        ID = data.data
+        print("ID: ", data.data)
+        # remove from the task priority list the task with this ID
+        for i, task in enumerate(self.taskPriorityQueue):
+            if(task.getID() == ID):
+                self.taskPriorityQueue.remove(task)
 
     # TODO: add help task to the priority queue or active queue
     def sendAnotherRobotForCameraViews(self, data):
@@ -563,6 +570,17 @@ class Middleman():
 
                 self.reassignmentCounter = time.time()
 
+    def checkNavStatus(self):
+        navTolerance = .1
+        for robot in self.activeRobotDictionary.values():
+            if(robot.currentTask.taskName == "NAV"):
+                if((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= navTolerance) and
+                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= navTolerance)):
+                        # if we do via points, instead of IDLE task, send next position in via points list
+                        info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+                        self.processTask(info_str)
+
+            pass
 
 middleman = Middleman()
 while not rospy.is_shutdown():
@@ -571,4 +589,5 @@ while not rospy.is_shutdown():
     middleman.publishRobotsLeftInQueue()
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
+    middleman.checkNavStatus()
     middleman.rate.sleep()
