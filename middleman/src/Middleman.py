@@ -10,13 +10,21 @@ from middleman.srv import TaskString, TaskStringResponse
 from Task import *
 import numpy as np
 
+# Todo: Change initialization of supervisor and operator publisher & subscriber
 
-# TODO: Use the name of the robot to determine all the topics for that specific robot since they are all the same
-# except the name
+# Todo: Allocate robots to supervisor based on num robots and num supervisor
 
-# TODO: We're proabbly going to have to have a topic for each of the robot joints as well.... Robot is going
-# to encapsulate a lot of information
+# Todo: Allocate robots to operators (see which ones are busy) -maybe add to hlp task variables
+#  -service client for busy
 
+# Todo: What happens if a new supervisor becomes active with already functioning robot team? Do we steal robots from
+#  other supervisor?
+
+# Todo: Should there be a minimum number of robots that a supervisor needs to actually 'log in'? e.g. 2 robots in
+#  fleet, 2 supervisors doesnt make sense
+
+# Todo: Need a priority queue, active task list for every supervisor - maybe we do move everything into a supervisor
+#  object. Still dont pass the middleman into it if possible
 
 class Middleman():
     def __init__(self):
