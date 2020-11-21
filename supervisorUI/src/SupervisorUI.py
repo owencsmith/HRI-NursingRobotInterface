@@ -399,11 +399,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
             if not self.LocationPicked:
                 self.ErrorLBL.show()
             else:
-                #TODO add pose info to task message. This value is stored in self.poseYaw. This probably needs a transform to
-                #TODO make the desired yaw match the robot yaw and then be converted to Radians
+                yaw = str(math.radians(self.poseYaw))
                 self.taskPublisher.publish(self.RobotTasksToCode[
                                                self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
-                    self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " + str(self.raisePriorityBox.isChecked()))
+                    self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " +yaw+" "+ str(self.raisePriorityBox.isChecked()))
                 if self.LocationPicked:
                     for item in self.LocationTargetShapes:
                         self.scene.removeItem(item)
