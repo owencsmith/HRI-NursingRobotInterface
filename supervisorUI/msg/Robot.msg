@@ -1,5 +1,0 @@
-string name
-TaskMsg currentTask
-string currentTaskName
-string status
-geometry_msgs/PoseWithCovarianceStamped pose

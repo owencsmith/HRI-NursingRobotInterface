@@ -13,9 +13,9 @@ import json
 import time
 import math
 from std_msgs.msg import *
-from supervisorUI.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
+from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
-from supervisorUI.srv import TaskString, TaskStringResponse
+from middleman.srv import TaskString, TaskStringResponse
 rospack = rospkg.RosPack()
 designerFile = rospack.get_path('supervisorUI')+"/src/SupervisorUI.ui"
 map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital.json"
@@ -43,6 +43,12 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.RoomNameList = []
         self.RobotTasksToCode = {}
         self.taskListRefresh = 0
+        self.poseYaw = 90
+        self.poseShapes = []
+        self.PoseSlider.setMinimum(0)
+        self.PoseSlider.setMaximum(360)
+        self.PoseSlider.valueChanged.connect(self.updatePoseLBL)
+        self.PoseSlider.setValue(0)
         self.robotUpdateSignal.connect(self.drawRobotCallback)
         self.robotTaskChangeSignal.connect(self.taskChangeMainThreadCallback)
         self.taskUpdateSignal.connect(self.taskListCallback)
@@ -57,6 +63,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SideMenuThread.signal.connect(self.SideMenuThreadCallback)
         self.pickLocation = False
         self.LocationPicked = False
+        self.clickedX = 0
+        self.clickedY= 0
         self.LocationCoordinates = (0, 0)
         self.CreateTaskButton.clicked.connect(self.ToggleSideMenu)
         self.SelectLocationBTN.clicked.connect(self.SelectLocationCallback)
@@ -218,33 +226,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
             cosy_cosp = 1 - 2 * (quat.y * quat.y + quat.z * quat.z)
             yaw = math.atan2(siny_cosp, cosy_cosp)
             #making the arrow
-            startArrowX = int(item.pose.pose.pose.position.x*100-math.cos(yaw)*obSize/4)
-            startArrowY = -int(item.pose.pose.pose.position.y*100-math.sin(yaw)*obSize/4)
-            endArrowX =int(item.pose.pose.pose.position.x*100+math.cos(yaw)*obSize/2-math.cos(yaw)*obSize/4)
-            endArrowY = -int(item.pose.pose.pose.position.y*100+math.sin(yaw)*obSize/2-math.sin(yaw)*obSize/4)
-            line = QGraphicsLineItem(startArrowX,
-                                     startArrowY,
-                                     endArrowX,
-                                    endArrowY)
-            line.setPen(QPen(self.black, 5))
-            self.scene.addItem(line)
-            self.RobotShapes.append(line)
-            line = QGraphicsLineItem(endArrowX,
-                                    endArrowY,
-                                     endArrowX-math.cos(3.14/4+yaw)*obSize/4,
-                                     endArrowY+math.sin(3.14/4+yaw)*obSize/4)
-
-            line.setPen(QPen(self.black, 5))
-            self.scene.addItem(line)
-            self.RobotShapes.append(line)
-            line = QGraphicsLineItem(endArrowX,
-                                    endArrowY,
-                                     endArrowX- math.cos(3.14 / 4 - yaw) * obSize / 4,
-                                     endArrowY- math.sin(3.14 / 4 - yaw) * obSize / 4)
-
-            line.setPen(QPen(self.black, 5))
-            self.scene.addItem(line)
-            self.RobotShapes.append(line)
+            arrowLines = self.makeArrow(item.pose.pose.pose.position.x*100, item.pose.pose.pose.position.y*100, yaw, obSize)
+            for line in arrowLines:
+                self.scene.addItem(line)
+                self.RobotShapes.append(line)
 
             type = item.currentTask.taskName
             if self.RobotTasks[type][1] == "True":
@@ -340,20 +325,21 @@ class SupervisorUI(QtWidgets.QMainWindow):
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
                     self.scene.removeItem(item)
-            clickedX = event.scenePos().x()
-            clickedY = event.scenePos().y()
-            self.LocationCoordinates = (round(clickedX/100, 3), round(-clickedY/100, 3))
-            self.XLocLabel.setText("X: "+"{:.2f}".format(clickedX/100))
-            self.YLocLabel.setText("Y: " + "{:.2f}".format(-clickedY/100))
+            self.clickedX = event.scenePos().x()
+            self.clickedY = event.scenePos().y()
+            self.LocationCoordinates = (round(self.clickedX/100, 3), round(-self.clickedY/100, 3))
+            self.XLocLabel.setText("X: "+"{:.2f}".format(self.clickedX/100))
+            self.YLocLabel.setText("Y: " + "{:.2f}".format(-self.clickedY/100))
             ##########################Draws Target on screen with 3 circles
             obSize = 50
-            shapes = self.makeTarget(clickedX, clickedY, obSize, self.red)
+            shapes = self.makeTarget(self.clickedX, self.clickedY, obSize, self.red)
             for shape in shapes:
                 self.LocationTargetShapes.append(shape)
                 self.scene.addItem(shape)
             #####################################################################
             self.pickLocation = False
             self.LocationPicked = True
+            self.drawPoseArrow()
             self.SelectLocationBTN.setEnabled(True)
 
     def makeTarget(self, X, Y, obSize, color):
@@ -380,17 +366,48 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
         return shapes
 
+    def makeArrow(self, X, Y, yaw, obSize):
+        lines = []
+        startArrowX = int(X - math.cos(yaw) * obSize / 4)
+        startArrowY = -int(Y - math.sin(yaw) * obSize / 4)
+        endArrowX = int(X + math.cos(yaw) * obSize / 2 - math.cos(yaw) * obSize / 4)
+        endArrowY = -int(Y + math.sin(yaw) * obSize / 2 - math.sin(yaw) * obSize / 4)
+        line1 = QGraphicsLineItem(startArrowX,
+                                 startArrowY,
+                                 endArrowX,
+                                 endArrowY)
+        line1.setPen(QPen(self.black, 5))
+        lines.append(line1)
+        line2 = QGraphicsLineItem(endArrowX,
+                                 endArrowY,
+                                 endArrowX - math.cos(3.14 / 4 + yaw) * obSize / 4,
+                                 endArrowY + math.sin(3.14 / 4 + yaw) * obSize / 4)
+
+        line2.setPen(QPen(self.black, 5))
+        lines.append(line2)
+        line3 = QGraphicsLineItem(endArrowX,
+                                 endArrowY,
+                                 endArrowX - math.cos(3.14 / 4 - yaw) * obSize / 4,
+                                 endArrowY - math.sin(3.14 / 4 - yaw) * obSize / 4)
+
+        line3.setPen(QPen(self.black, 5))
+        lines.append(line3)
+        return lines
+
     def confirmTaskCreationCallback(self):
-        #Task Strings: 'task_name robot_name X Y [vars ...]'
         if self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]][1]=="True":
             if not self.LocationPicked:
                 self.ErrorLBL.show()
             else:
+                #TODO add pose info to task message. This value is stored in self.poseYaw. This probably needs a transform to
+                #TODO make the desired yaw match the robot yaw and then be converted to Radians
                 self.taskPublisher.publish(self.RobotTasksToCode[
                                                self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
                     self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " + str(self.raisePriorityBox.isChecked()))
                 if self.LocationPicked:
                     for item in self.LocationTargetShapes:
+                        self.scene.removeItem(item)
+                    for item in self.poseShapes:
                         self.scene.removeItem(item)
                 self.ErrorLBL.hide()
                 self.populateTaskComboBox()
@@ -408,6 +425,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
                                        str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) +  " " + str(self.raisePriorityBox.isChecked()))
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
+                    self.scene.removeItem(item)
+                for item in self.poseShapes:
                     self.scene.removeItem(item)
             self.ErrorLBL.hide()
             self.populateTaskComboBox()
@@ -459,6 +478,21 @@ class SupervisorUI(QtWidgets.QMainWindow):
         else:
             for item in self.ObstacleList:
                 self.scene.removeItem(item)
+
+    def updatePoseLBL(self):
+        self.poseYaw = self.PoseSlider.value()*-1+90
+        self.PoseDeg.setText(str(self.PoseSlider.value()) + " Deg")
+        self.drawPoseArrow()
+
+    def drawPoseArrow(self):
+        if self.LocationPicked:
+            for line in self.poseShapes:
+                self.scene.removeItem(line)
+            self.poseShapes = []
+            lines = self.makeArrow(self.clickedX, -self.clickedY, math.radians(self.poseYaw), 50)
+            for line in lines:
+                self.poseShapes.append(line)
+                self.scene.addItem(line)
 
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
@@ -512,11 +546,16 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.YLocLabel.move(self.slideInMenuWidth*0.52, self.windowHeight*0.21)
         self.YLocLabel.resize(self.slideInMenuWidth*0.45, self.windowHeight*0.02)
 
-        self.ConfirmTask.move(self.slideInMenuWidth*0.05, self.windowHeight*0.24)
+        self.PoseSlider.move(self.slideInMenuWidth*0.05, self.windowHeight*0.24)
+        self.PoseSlider.resize(self.slideInMenuWidth*0.7, self.windowHeight*0.04)
+        self.PoseDeg.move(self.slideInMenuWidth*0.80, self.windowHeight*0.24)
+        self.PoseDeg.resize(self.slideInMenuWidth*0.2, self.windowHeight*0.04)
+
+        self.ConfirmTask.move(self.slideInMenuWidth*0.05, self.windowHeight*0.28)
         self.ConfirmTask.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.04)
 
         self.ErrorLBL.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.02)
-        self.ErrorLBL.move(self.slideInMenuWidth*0.05, self.windowHeight*0.28)
+        self.ErrorLBL.move(self.slideInMenuWidth*0.05, self.windowHeight*0.32)
 
         self.TaskSwitchFrame.hide()
         TaskFrameWidth = self.windowWidth*0.6
