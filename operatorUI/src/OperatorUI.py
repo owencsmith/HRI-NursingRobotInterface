@@ -19,7 +19,7 @@ from sensor_msgs.msg import Image, LaserScan
 import numpy as np
 rospack = rospkg.RosPack()
 designerFile = rospack.get_path('operatorUI')+"/src/OperatorUI.ui"
-map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital"
+map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital.json"
 
 class OperatorUI(QtWidgets.QMainWindow):
     robotUpdateSignal = pyqtSignal('PyQt_PyObject')
