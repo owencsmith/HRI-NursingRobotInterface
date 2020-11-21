@@ -3,9 +3,9 @@ import rospy
 import rospkg
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
-    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem
+    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel
+from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel, QIcon
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint, QPointF
 from PyQt5.QtCore import Qt, QLineF, QRectF
 import sys
@@ -18,7 +18,8 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from supervisorUI.srv import TaskString, TaskStringResponse
 rospack = rospkg.RosPack()
 designerFile = rospack.get_path('supervisorUI')+"/src/SupervisorUI.ui"
-map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital"
+map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital.json"
+icon = rospack.get_path('supervisorUI')+"/src/trashCanIcon.jpg"
 
 class SupervisorUI(QtWidgets.QMainWindow):
     robotUpdateSignal = pyqtSignal('PyQt_PyObject')
@@ -37,7 +38,11 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.LocationTargetShapes = []
         self.RobotNames = []
         self.RobotTasks = {}
+        self.GoalTarget = []
+        self.ObstacleList = []
+        self.RoomNameList = []
         self.RobotTasksToCode = {}
+        self.taskListRefresh = 0
         self.robotUpdateSignal.connect(self.drawRobotCallback)
         self.robotTaskChangeSignal.connect(self.taskChangeMainThreadCallback)
         self.taskUpdateSignal.connect(self.taskListCallback)
@@ -45,6 +50,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.taskSubscriber = rospy.Subscriber('/supervisor/taskList', TaskMsgArr, self.taskListRosCallback)
         self.taskChangeSubscriber = rospy.Subscriber('/supervisor/taskReassignment', TaskMsgArr, self.taskChangeCallback)
         self.taskPublisher = rospy.Publisher("/supervisor/task", String, queue_size=10)
+        self.deleteTaskPublisher = rospy.Publisher("/supervisor/removeTask", String, queue_size=10)
         rospy.wait_for_service('/supervisor/taskCodes')
         self.fillRobotTasks()
         self.SideMenuThread = SideMenuThread()
@@ -57,8 +63,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.ConfirmTask.clicked.connect(self.confirmTaskCreationCallback)
         self.TaskSwitchOKBTN.clicked.connect(self.okBTNCallback)
         self.SelectTaskCB.activated.connect(self.taskComboBoxChanged)
-        #subscriber for reciecing robot locations on the map
-        #graphicsSize = self.SupervisorMap.size()
+        self.PriorityQueueTable.cellClicked.connect(self.taskListClickedCallback)
+        self.ToggleObstaclesCB.stateChanged.connect(self.obstacleComboBoxChanged)
         self.black = QColor(qRgb(0, 0, 0))
         self.blue = QColor(qRgb(30, 144, 255))
         self.red = QColor(qRgb(220, 20, 60))
@@ -68,6 +74,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.purple = QColor(qRgb(238, 130, 238))
         self.magenta = QColor(qRgb(255, 0, 255))
         self.white = QColor(qRgb(255, 255, 255))
+        self.gray = QColor(qRgb(119, 136, 153))
         self.scaleFactor = 0.4*self.mapWidth/1500 #the map was designed for a 1500 pixel square map.This adjusts for the screen size
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
@@ -118,11 +125,12 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.RobotListTable.setColumnCount(3)
         self.RobotListTable.setHorizontalHeaderLabels(('Robot ID', 'Task', 'Status'))
         self.RobotListTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.PriorityQueueTable.setColumnCount(3)
-        self.PriorityQueueTable.setHorizontalHeaderLabels(('Task', 'ID', 'Priority'))
+        self.PriorityQueueTable.setColumnCount(4)
+        self.PriorityQueueTable.setHorizontalHeaderLabels(('Task', 'ID', 'Priority', ''))
         self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
 
 
     def loadMap(self, mapLocation):
@@ -145,7 +153,16 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 font.setWeight(QFont.Bold)
                 label.setFont(font)
                 label.setRotation(item["rotation"])
+                self.RoomNameList.append(label)
                 self.scene.addItem(label)
+            elif (item["type"]=="obstacle"):
+                shape = QGraphicsRectItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
+                                          item["length"], item["width"])
+                shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
+                shape.setPen(QPen(self.gray))
+                shape.setBrush(QBrush(self.gray, Qt.SolidPattern))
+                shape.setRotation(item["rotation"])
+                self.ObstacleList.append(shape)
         self.SupervisorMap.scale(self.scaleFactor, self.scaleFactor)
 
     def wheelEvent(self, event):
@@ -159,18 +176,12 @@ class SupervisorUI(QtWidgets.QMainWindow):
             if (self.scaleFactor > 0.4*self.mapWidth/1500):
                 self.scaleFactor -= 0.01*self.mapWidth/1500
         self.SupervisorMap.scale(self.scaleFactor/oldScale, self.scaleFactor/oldScale)
-        #self.SupervisorMap.setTransformationAnchor(QGraphicsView.NoAnchor)
         pointAfterScale = self.SupervisorMap.mapToScene(event.pos())
         offset = pointAfterScale-pointBeforeScale
         center = self.SupervisorMap.mapToScene(self.SupervisorMap.viewport().rect().center())
-        #self.SupervisorMap.setViewport(QPointF(center+offset))
-        print(center+offset)
-        print(center)
-        print(" ")
         self.SupervisorMap.centerOn(center-offset)
 
     def robotStateCallback(self, message):
-        #print("MSG received")
         self.robotUpdateSignal.emit(message)
 
     def drawRobotCallback(self, result):
@@ -206,8 +217,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
             siny_cosp = 2 * (quat.w * quat.z + quat.x * quat.y)
             cosy_cosp = 1 - 2 * (quat.y * quat.y + quat.z * quat.z)
             yaw = math.atan2(siny_cosp, cosy_cosp)
-
-            #item.pose.pose.pose.orientation.z = item.pose.pose.pose.orientation.z+3.14/2
             #making the arrow
             startArrowX = int(item.pose.pose.pose.position.x*100-math.cos(yaw)*obSize/4)
             startArrowY = -int(item.pose.pose.pose.position.y*100-math.sin(yaw)*obSize/4)
@@ -237,17 +246,73 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.scene.addItem(line)
             self.RobotShapes.append(line)
 
+            type = item.currentTask.taskName
+            if self.RobotTasks[type][1] == "True":
+
+                X = item.currentTask.X * 100
+                Y = item.currentTask.Y * -100
+                shapes = self.makeTarget(X, Y, 50, self.red)
+                for shape in shapes:
+                    self.RobotShapes.append(shape)
+                    self.scene.addItem(shape)
+                label = QGraphicsTextItem(item.name + " Goal")
+                label.setX(int(X))
+                label.setY(int(Y - obSize))
+                font = QFont("Bavaria")
+                font.setPointSize(18)
+                font.setWeight(QFont.Bold)
+                label.setDefaultTextColor(self.red)
+                label.setFont(font)
+                self.scene.addItem(label)
+                self.RobotShapes.append(label)
+
+
     def taskListRosCallback(self, message):
         self.taskUpdateSignal.emit(message)
 
     def taskListCallback(self, result):
-        self.PriorityQueueTable.setRowCount(0)  # clear table
-        for item in result.taskMsgs:
-            if item.robotName == "unassigned":
-                self.PriorityQueueTable.insertRow(self.PriorityQueueTable.rowCount())
-                self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 0, QTableWidgetItem(item.taskName))
-                self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 1, QTableWidgetItem(item.ID))
-                self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 2, QTableWidgetItem("{:.2f}".format(item.taskPriority)))
+        self.taskListRefresh +=1
+        if self.taskListRefresh ==4:#this slowsdown the refresh rate so the buttons work more easily
+            self.taskListRefresh = 0
+            self.PriorityQueueTable.setRowCount(0)  # clear table
+            for item in result.taskMsgs:
+                if item.robotName == "unassigned":
+                    self.PriorityQueueTable.insertRow(self.PriorityQueueTable.rowCount())
+                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 0, QTableWidgetItem(item.taskName))
+                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 1, QTableWidgetItem(item.ID))
+                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 2, QTableWidgetItem("{:.2f}".format(item.taskPriority)))
+                    icon_item = QTableWidgetItem()
+                    icon_item.setIcon(QIcon(icon))
+                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 3, icon_item)
+
+    def taskListClickedCallback(self, row, col):
+        if col !=3:
+            self.drawGoalPointTaskList(row)
+        else:
+            self.deleteTask(row)
+
+    def deleteTask(self, row):
+        id = self.PriorityQueueTable.item(row, 1).text()
+        print(id)
+        self.deleteTaskPublisher.publish(id)
+
+    def drawGoalPointTaskList(self, row):
+        self.removeGoalItem()
+        type = self.PriorityQueueTable.item(row, 0).text()
+        if self.RobotTasks[type][1] == "True":
+            id = self.PriorityQueueTable.item(row, 1).text()
+            parts = id.split("_")
+            X = float(parts[1])*100
+            Y = float(parts[2])*-100
+            shapes = self.makeTarget(X, Y, 50, self.blue)
+            for shape in shapes:
+                self.GoalTarget.append(shape)
+                self.scene.addItem(shape)
+
+    def removeGoalItem(self):
+        for item in self.GoalTarget:
+            self.scene.removeItem(item)
+        self.GoalTarget = []
 
     def fillRobotTasks(self):
         self.RobotTasks = {}
@@ -270,6 +335,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.pickLocation = True
 
     def mapClickEventHandler(self, event):
+        self.removeGoalItem()
         if self.pickLocation:
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
@@ -281,32 +347,38 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.YLocLabel.setText("Y: " + "{:.2f}".format(-clickedY/100))
             ##########################Draws Target on screen with 3 circles
             obSize = 50
-            shape = QGraphicsEllipseItem(int(clickedX - obSize / 2),
-                                         int(clickedY - obSize / 2), obSize, obSize)
-            shape.setPen(QPen(self.red))
-            shape.setBrush(QBrush(self.red, Qt.SolidPattern))
-            self.LocationTargetShapes.append(shape)
-            self.scene.addItem(shape)
-
-            obSize = 40
-            shape = QGraphicsEllipseItem(int(clickedX - obSize / 2),
-                                         int(clickedY - obSize / 2), obSize, obSize)
-            shape.setPen(QPen(self.white))
-            shape.setBrush(QBrush(self.white, Qt.SolidPattern))
-            self.LocationTargetShapes.append(shape)
-            self.scene.addItem(shape)
-
-            obSize = 30
-            shape = QGraphicsEllipseItem(int(clickedX - obSize / 2),
-                                         int(clickedY - obSize / 2), obSize, obSize)
-            shape.setPen(QPen(self.red))
-            shape.setBrush(QBrush(self.red, Qt.SolidPattern))
-            self.LocationTargetShapes.append(shape)
-            self.scene.addItem(shape)
+            shapes = self.makeTarget(clickedX, clickedY, obSize, self.red)
+            for shape in shapes:
+                self.LocationTargetShapes.append(shape)
+                self.scene.addItem(shape)
             #####################################################################
             self.pickLocation = False
             self.LocationPicked = True
             self.SelectLocationBTN.setEnabled(True)
+
+    def makeTarget(self, X, Y, obSize, color):
+        shapes = []
+        shape1 = QGraphicsEllipseItem(int(X - obSize / 2),
+                                     int(Y - obSize / 2), obSize, obSize)
+        shape1.setPen(QPen(color))
+        shape1.setBrush(QBrush(color, Qt.SolidPattern))
+
+        obSize = obSize-10
+        shape2 = QGraphicsEllipseItem(int(X - obSize / 2),
+                                     int(Y - obSize / 2), obSize, obSize)
+        shape2.setPen(QPen(self.white))
+        shape2.setBrush(QBrush(self.white, Qt.SolidPattern))
+
+        obSize = obSize-10
+        shape3 = QGraphicsEllipseItem(int(X - obSize / 2),
+                                     int(Y - obSize / 2), obSize, obSize)
+        shape3.setPen(QPen(color))
+        shape3.setBrush(QBrush(color, Qt.SolidPattern))
+        shapes.append(shape1)
+        shapes.append(shape2)
+        shapes.append(shape3)
+
+        return shapes
 
     def confirmTaskCreationCallback(self):
         #Task Strings: 'task_name robot_name X Y [vars ...]'
@@ -376,6 +448,18 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.YLocLabel.setText("Y: ")
             self.LocationPicked = False
 
+    def obstacleComboBoxChanged(self):
+        if self.ToggleObstaclesCB.isChecked():
+            for item in self.RoomNameList:
+                self.scene.removeItem(item)
+            for item in self.ObstacleList:
+                self.scene.addItem(item)
+            for item in self.RoomNameList:
+                self.scene.addItem(item)
+        else:
+            for item in self.ObstacleList:
+                self.scene.removeItem(item)
+
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
         #aspect ratio
@@ -400,6 +484,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.PriorityQueueTable.resize(robotListWidth, self.windowHeight * 0.28)
         self.SupervisorMap.resize(self.mapWidth, self.windowHeight)
         self.SupervisorMap.move(robotListWidth, 0)
+        self.ToggleObstaclesCB.move(robotListWidth+self.windowWidth*0.01, self.windowHeight*0.96)
+        self.ToggleObstaclesCB.resize(createTaskButtonWidth, createTaskButtonHeight)
         self.CreateTaskButton.resize(createTaskButtonWidth, createTaskButtonHeight)
         self.CreateTaskButton.move(self.windowWidth*0.96-createTaskButtonWidth, self.windowHeight*0.98-createTaskButtonHeight)
         self.SideMenu.move(self.windowWidth, 0)

@@ -86,6 +86,15 @@
      },
     {
       "name":"Last Sliver of Wall","type": "rect", "centerX": 308, "centerY": -1187, "length": 25, "width": 16, "rotation": 90
+     },
+     {
+     "name":"Tables","type": "obstacle", "centerX": 720, "centerY": -150, "length": 150, "width": 150, "rotation": 0
+     },
+    {
+     "name":"Chair","type": "obstacle", "centerX": 360, "centerY": -225, "length": 90, "width": 175, "rotation": 0
+     },
+    {
+     "name":"Chair","type": "obstacle", "centerX": 360, "centerY": -75, "length": 90, "width": 100, "rotation": 0
      }
   ]
 }
