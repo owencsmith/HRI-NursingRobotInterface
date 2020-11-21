@@ -5,7 +5,8 @@ from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
     QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
-from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel, QIcon
+from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel, QIcon, \
+    QImage, QPixmap
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint, QPointF
 from PyQt5.QtCore import Qt, QLineF, QRectF
 import sys
@@ -16,15 +17,18 @@ from std_msgs.msg import *
 from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from middleman.srv import TaskString, TaskStringResponse
+from sensor_msgs.msg import Image
 rospack = rospkg.RosPack()
 designerFile = rospack.get_path('supervisorUI')+"/src/SupervisorUI.ui"
 map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital.json"
-icon = rospack.get_path('supervisorUI')+"/src/trashCanIcon.jpg"
+trashIcon = rospack.get_path('supervisorUI') + "/src/trashCanIcon.jpg"
+cameraIcon = rospack.get_path('supervisorUI') + "/src/camera-icon.png"
 
 class SupervisorUI(QtWidgets.QMainWindow):
     robotUpdateSignal = pyqtSignal('PyQt_PyObject')
     taskUpdateSignal = pyqtSignal('PyQt_PyObject')
     robotTaskChangeSignal = pyqtSignal('PyQt_PyObject')
+    CamUpdateSignal = pyqtSignal('PyQt_PyObject')
     def __init__(self, width, height):
         super(SupervisorUI, self).__init__()
         self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
@@ -52,11 +56,13 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.robotUpdateSignal.connect(self.drawRobotCallback)
         self.robotTaskChangeSignal.connect(self.taskChangeMainThreadCallback)
         self.taskUpdateSignal.connect(self.taskListCallback)
+        self.CamUpdateSignal.connect(self.CamUpdate)
         self.stateSubscriber = rospy.Subscriber('/supervisor/robotState', RobotArr, self.robotStateCallback)
         self.taskSubscriber = rospy.Subscriber('/supervisor/taskList', TaskMsgArr, self.taskListRosCallback)
         self.taskChangeSubscriber = rospy.Subscriber('/supervisor/taskReassignment', TaskMsgArr, self.taskChangeCallback)
         self.taskPublisher = rospy.Publisher("/supervisor/task", String, queue_size=10)
         self.deleteTaskPublisher = rospy.Publisher("/supervisor/removeTask", String, queue_size=10)
+        self.CamSubscriber = rospy.Subscriber('none', Image, self.CamRosCallback)
         rospy.wait_for_service('/supervisor/taskCodes')
         self.fillRobotTasks()
         self.SideMenuThread = SideMenuThread()
@@ -73,6 +79,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SelectTaskCB.activated.connect(self.taskComboBoxChanged)
         self.PriorityQueueTable.cellClicked.connect(self.taskListClickedCallback)
         self.ToggleObstaclesCB.stateChanged.connect(self.obstacleComboBoxChanged)
+        self.CloseCameraBTN.clicked.connect(self.closeCam)
+        self.RobotListTable.cellClicked.connect(self.openCam)
         self.black = QColor(qRgb(0, 0, 0))
         self.blue = QColor(qRgb(30, 144, 255))
         self.red = QColor(qRgb(220, 20, 60))
@@ -130,9 +138,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
             pass
 
     def SetUpTable(self):
-        self.RobotListTable.setColumnCount(3)
-        self.RobotListTable.setHorizontalHeaderLabels(('Robot ID', 'Task', 'Status'))
+        self.RobotListTable.setColumnCount(4)
+        self.RobotListTable.setHorizontalHeaderLabels(('Robot ID', 'Task', 'Status', ''))
         self.RobotListTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.RobotListTable.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.PriorityQueueTable.setColumnCount(4)
         self.PriorityQueueTable.setHorizontalHeaderLabels(('Task', 'ID', 'Priority', ''))
         self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -203,6 +212,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 0, QTableWidgetItem(item.name))
             self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 1, QTableWidgetItem(item.currentTaskName))
             self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 2, QTableWidgetItem(item.status))
+            icon_item = QTableWidgetItem()
+            icon_item.setIcon(QIcon(cameraIcon))
+            self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 3, icon_item)
             obSize = 70
             shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
@@ -267,7 +279,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 1, QTableWidgetItem(item.ID))
                     self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 2, QTableWidgetItem("{:.2f}".format(item.taskPriority)))
                     icon_item = QTableWidgetItem()
-                    icon_item.setIcon(QIcon(icon))
+                    icon_item.setIcon(QIcon(trashIcon))
                     self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 3, icon_item)
 
     def taskListClickedCallback(self, row, col):
@@ -493,6 +505,29 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.poseShapes.append(line)
                 self.scene.addItem(line)
 
+    def CamRosCallback(self, result):
+        self.CamUpdateSignal.emit(result)
+
+    def CamUpdate(self, result):
+        image = QImage(result.data, result.width, result.height, result.step, QImage.Format_RGB888)
+        image = image.scaled(self.CameraView.width(), self.CameraView.height(), Qt.KeepAspectRatio)
+        pixmap = QPixmap.fromImage(image)
+        self.CameraView.setPixmap(pixmap)
+
+    def closeCam(self):
+        self.CamSubscriber.unregister()
+        self.CameraFrame.hide()
+
+    def openCam(self, row, col):
+        if col==3:
+            self.CamSubscriber.unregister()
+            name = self.RobotListTable.item(row, 0).text()
+            self.CamSubscriber = rospy.Subscriber("/" + name + "/main_cam/color/image_raw", Image,
+                                                      self.CamRosCallback)
+
+            self.viewingLBL.setText("Viewing: "+ name)
+        self.CameraFrame.show()
+
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
         #aspect ratio
@@ -523,6 +558,15 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.CreateTaskButton.move(self.windowWidth*0.96-createTaskButtonWidth, self.windowHeight*0.98-createTaskButtonHeight)
         self.SideMenu.move(self.windowWidth, 0)
         self.SideMenu.resize(self.slideInMenuWidth, self.windowHeight)
+        self.CameraFrame.move(robotListWidth, 0)
+        self.CameraFrame.resize(self.windowWidth*0.3, self.windowWidth*0.28)
+        self.CameraView.move(self.CameraFrame.width()*0.01, self.CameraFrame.height()*0.01)
+        self.CameraView.resize(self.CameraFrame.width()*0.98, self.CameraFrame.height()*0.88)
+        self.viewingLBL.move(self.CameraFrame.width()*0.01,self.CameraFrame.height()*0.9)
+        self.viewingLBL.resize(self.CameraFrame.width()*0.5, self.CameraFrame.height()*0.09)
+        self.CloseCameraBTN.move(self.CameraFrame.width()*0.55,self.CameraFrame.height()*0.9)
+        self.CloseCameraBTN.resize(self.CameraFrame.width()*0.4, self.CameraFrame.height()*0.09)
+        self.CameraFrame.hide()
 
         self.TaskCreatorLabel.move(self.slideInMenuWidth*0.05, self.windowHeight*0.01)
         self.TaskCreatorLabel.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.04)

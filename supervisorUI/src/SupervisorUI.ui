@@ -357,6 +357,88 @@ border-color: rgb(238, 238, 236);</string>
      <string>Toggle Obstacles</string>
     </property>
    </widget>
+   <widget class="QFrame" name="CameraFrame">
+    <property name="geometry">
+     <rect>
+      <x>320</x>
+      <y>490</y>
+      <width>451</width>
+      <height>271</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">border-color:rgb(0, 0, 0);
+border-width: 3px;
+border-style: outset;
+background-color: rgb(211, 215, 207);</string>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="QLabel" name="CameraView">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>20</y>
+       <width>321</width>
+       <height>161</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">border-color:rgb(0, 0, 0);
+border-width: 0px;
+border-style: outset;
+background-color: rgb(211, 215, 207);</string>
+     </property>
+     <property name="text">
+      <string>Supervisor Video</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="CloseCameraBTN">
+     <property name="geometry">
+      <rect>
+       <x>240</x>
+       <y>180</y>
+       <width>170</width>
+       <height>48</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">border-color:rgb(0, 0, 0);
+border-width: 0px;
+border-style: outset;
+background-color: rgb(255, 255, 255);</string>
+     </property>
+     <property name="text">
+      <string>Close</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="viewingLBL">
+     <property name="geometry">
+      <rect>
+       <x>60</x>
+       <y>190</y>
+       <width>129</width>
+       <height>34</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">border-color: rgb(211, 215, 207);
+border-width: 0px;
+border-style: outset;
+background-color: rgb(211, 215, 207);</string>
+     </property>
+     <property name="text">
+      <string>Viewing: </string>
+     </property>
+    </widget>
+   </widget>
    <zorder>SideMenu</zorder>
    <zorder>SupervisorMap</zorder>
    <zorder>RobotListTable</zorder>
@@ -365,6 +447,7 @@ border-color: rgb(238, 238, 236);</string>
    <zorder>priorityQueueLBL</zorder>
    <zorder>PriorityQueueTable</zorder>
    <zorder>ToggleObstaclesCB</zorder>
+   <zorder>CameraFrame</zorder>
   </widget>
  </widget>
  <resources/>
