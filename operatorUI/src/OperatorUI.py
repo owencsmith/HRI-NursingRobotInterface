@@ -114,7 +114,6 @@ class OperatorUI(QtWidgets.QMainWindow):
 
     def RequestCameraBTNCallback(self):
         if(self.secondCameraShowing):
-            #TODO Owen and Gabe add method to call off camera robot here
             self.releaseCameraPublisher.publish('Begone Thot')
             self.helperRobot = None
             self.SecondaryCamSubscriber.unregister()
