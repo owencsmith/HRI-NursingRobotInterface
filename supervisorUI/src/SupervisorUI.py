@@ -420,8 +420,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.YLocLabel.setText("Y:")
                 self.LocationPicked = False
         else:
+            yaw = str(math.radians(self.poseYaw))
             self.taskPublisher.publish(self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " +
-                                       str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) +  " " + str(self.raisePriorityBox.isChecked()))
+                                       str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) + " " + yaw + " " + str(self.raisePriorityBox.isChecked()))
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
                     self.scene.removeItem(item)

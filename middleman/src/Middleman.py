@@ -128,7 +128,10 @@ class Middleman():
         taskName = dataList[0]
         # passed as unassigned if task is not assigned
         robotName = dataList[1]
-        if(dataList[4] == "False"):
+
+        yaw = float(dataList[4])
+        raisePriority = dataList[5]
+        if(raisePriority == "False"):
             priorityRaised = False
         else:
             priorityRaised = True
@@ -137,15 +140,15 @@ class Middleman():
         print(len(dataList))
         print(dataList)
 
-        if len(dataList) > 5:
-            variables = dataList[5]
-        else:
-            variables = " "
+        # if len(dataList) > 5:
+        #     variables = dataList[5]
+        # else:
+        #     variables = " "
 
         if (taskName != 'SOS'):
             X = float(dataList[2])
             Y = float(dataList[3])
-            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, priorityRaised, variables) # help task has yaw here
+            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised)
             newTaskMsg = newTask.convertTaskToTaskMsg()
             if robotName != "unassigned":
                 # remove current task form active task list
@@ -175,7 +178,7 @@ class Middleman():
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
-        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
         pass
 
     def clnTask(self, taskMsg):
@@ -190,7 +193,7 @@ class Middleman():
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
-        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
         pass
 
     # @TODO without autonomy work the same as nav task
@@ -206,7 +209,7 @@ class Middleman():
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
-        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y))
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
 
         # data = task.variables.split()
         # toX = data[0]
@@ -233,8 +236,7 @@ class Middleman():
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
         print(taskMsg.variables)
-        yaw_num = float(taskMsg.variables)
-        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), yaw=yaw_num)
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
         self.TellOperatorThatRobotCameraIsAvailable.publish(taskMsg.robotName)
 
     # do nothing
@@ -246,10 +248,13 @@ class Middleman():
          :return:  none
          """
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
-        currentRobot.currentTask = taskMsg
-        currentRobot.currentTaskName = taskMsg.taskName
+        currentRobotOrient = currentRobot.pose.pose.pose.orientation
+        quat_list = [currentRobotOrient.x, currentRobotOrient.y, currentRobotOrient.z,
+                     currentRobotOrient.w]
+        robotEuler = euler_from_quaternion(quat_list)
+        robYaw = robotEuler[2]
         self.sendRobotToPos(currentRobot, float(currentRobot.pose.pose.pose.position.x),
-                            float(currentRobot.pose.pose.pose.position.y))
+                            float(currentRobot.pose.pose.pose.position.y), float(robYaw))
 
     def sendRobotToPos(self, currentRobot, X, Y, yaw=0):
         """
@@ -265,7 +270,8 @@ class Middleman():
         poseStamped.pose.position.y = Y
         poseStamped.header.frame_id = 'map'
 
-        q_orientation = quaternion_from_euler(0, 0, yaw + np.pi)
+        # add 90 deg for offset with UI. Our Z is out of the page, 0 is pointing left
+        q_orientation = quaternion_from_euler(0, 0, (-yaw) + np.pi)
 
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.x = q_orientation[0]
@@ -334,7 +340,7 @@ class Middleman():
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
             if robot.currentTaskName == "HLP":
-                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
                 self.processTask(info_str)
                 break
 
@@ -349,7 +355,7 @@ class Middleman():
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
             if robot.currentTaskName == "HLP":
-                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
                 self.processTask(info_str)
                 break
 
@@ -385,7 +391,8 @@ class Middleman():
         robotToNavigateToX = robotToNavigateToPose.x - xBuffer
         robotToNavigateToY = robotToNavigateToPose.y - yBuffer
 
-        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + 'False' + ' ' + str(robYaw-np.pi/4)
+        # todo, try and fix this now....
+        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + str(robYaw+(5*np.pi/4)) + ' ' + 'False' + ' '
 
         print(info_str)
         self.processTask(info_str)
@@ -440,7 +447,7 @@ class Middleman():
         newRobot.name = data.data
         newRobot.status = "OK"
 
-        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, False, " ")
+        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, 0, False, " ")
         initialTaskMsg = initialTask.convertTaskToTaskMsg()
         newRobot.currentTaskName = initialTaskMsg.taskName
         newRobot.currentTask = initialTaskMsg
@@ -585,7 +592,7 @@ class Middleman():
                 if((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= navTolerance) and
                         (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= navTolerance)):
                         # if we do via points, instead of IDLE task, send next position in via points list
-                        info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+                        info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
                         self.processTask(info_str)
 
             pass
@@ -597,5 +604,5 @@ while not rospy.is_shutdown():
     middleman.publishRobotsLeftInQueue()
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
-    middleman.checkNavStatus()
+    #middleman.checkNavStatus()
     middleman.rate.sleep()
