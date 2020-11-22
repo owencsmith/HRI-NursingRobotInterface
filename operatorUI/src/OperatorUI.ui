@@ -289,6 +289,19 @@ border-style: outset;
 background-color: transparent;</string>
     </property>
    </widget>
+   <widget class="QCheckBox" name="ToggleObstaclesCB">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>560</y>
+      <width>175</width>
+      <height>40</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Toggle Obstacles</string>
+    </property>
+   </widget>
   </widget>
  </widget>
  <resources/>
