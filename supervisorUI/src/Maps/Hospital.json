@@ -95,6 +95,138 @@
      },
     {
      "name":"Chair","type": "obstacle", "centerX": 360, "centerY": -75, "length": 90, "width": 100, "rotation": 0
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": 600, "centerY": -570, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": 775, "centerY": -570, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"plant","type": "plant", "centerX": 830, "centerY": -425, "length": 110, "width": 110, "rotation": 0
+     },
+    {
+     "name":"plant","type": "plant", "centerX": 830, "centerY": -475, "length": 110, "width": 110, "rotation": 0
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": 530, "centerY": -632, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": 705, "centerY": -632, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": 530, "centerY": -1160, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": 705, "centerY": -1160, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": 340, "centerY": -750, "length": 50, "width": 90, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": 340, "centerY": -900, "length": 50, "width": 90, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": 420, "centerY": -750, "length": 50, "width": 90, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": 420, "centerY": -905, "length": 50, "width": 90, "rotation": 0
+     },
+    {
+     "name":"plant","type": "plant", "centerX": -110, "centerY": -1140, "length": 110, "width": 110, "rotation": 0
+     },
+    {
+     "name":"plant","type": "plant", "centerX": -190, "centerY": -1140, "length": 110, "width": 110, "rotation": 0
+     },
+    {
+     "name":"plant","type": "plant", "centerX": -440, "centerY": 845, "length": 110, "width": 110, "rotation": 0
+     },
+    {
+     "name":"plant","type": "plant", "centerX": -490, "centerY": 845, "length": 110, "width": 110, "rotation": 0
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": 800, "centerY": 30, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": 825, "centerY": 150, "length": 50, "width": 90, "rotation": 90
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": 825, "centerY": 250, "length": 50, "width": 90, "rotation": 0
+     },
+    {
+     "name":"Chair","type": "obstacle", "centerX": 840, "centerY": 425, "length": 90, "width": 150, "rotation": 0
+     },
+    {
+     "name":"Chair","type": "obstacle", "centerX": 840, "centerY": 575, "length": 90, "width": 150, "rotation": 0
+     },
+    {
+     "name":"Bed","type": "obstacle", "centerX": 430, "centerY": 350, "length": 215, "width": 95, "rotation": 0
+     },
+    {
+     "name":"Bed","type": "obstacle", "centerX": 430, "centerY": 750, "length": 215, "width": 95, "rotation": 0
+     },
+    {
+     "name":"Bench","type": "obstacle", "centerX": 35, "centerY": 520, "length": 70, "width": 150, "rotation": 0
+     },
+    {
+     "name":"Bench","type": "obstacle", "centerX": 265, "centerY": 225, "length": 70, "width": 150, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": 260, "centerY": 400, "length": 50, "width": 90, "rotation": 0
+     },
+    {
+     "name":"Bench","type": "obstacle", "centerX": 35, "centerY": -390, "length": 70, "width": 150, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": 40, "centerY": -580, "length": 50, "width": 90, "rotation": 0
+     },
+    {
+     "name":"Bench","type": "obstacle", "centerX": 265, "centerY": -880, "length": 70, "width": 150, "rotation": 0
+     },
+    {
+     "name":"Bench","type": "obstacle", "centerX": -850, "centerY": -390, "length": 70, "width": 150, "rotation": 0
+     },
+    {
+     "name":"Bed","type": "obstacle", "centerX": -515, "centerY": -48, "length": 215, "width": 95, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": -290, "centerY": -30, "length": 50, "width": 90, "rotation": 90
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": -125, "centerY": 35, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": -310, "centerY": 35, "length": 160, "width": 45, "rotation": 0
+     },
+    {
+     "name":"Bed","type": "obstacle", "centerX": -480, "centerY": 345, "length": 215, "width": 95, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": -150, "centerY": 550, "length": 50, "width": 90, "rotation": 90
+     },
+    {
+     "name":"Chair","type": "obstacle", "centerX": -410, "centerY": 740, "length": 90, "width": 150, "rotation": 90
+     },
+    {
+     "name":"Chair","type": "obstacle", "centerX": -530, "centerY": 670, "length": 90, "width": 100, "rotation": 45
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": -40, "centerY": -420, "length": 160, "width": 45, "rotation": 90
+     },
+    {
+     "name":"Shelf","type": "obstacle", "centerX": -40, "centerY": -600, "length": 160, "width": 45, "rotation": 90
+     },
+    {
+     "name":"Bed","type": "obstacle", "centerX": -480, "centerY": -550, "length": 215, "width": 95, "rotation": 0
+     },
+    {
+     "name":"cart","type": "obstacle", "centerX": -50, "centerY": -770, "length": 50, "width": 90, "rotation": 0
+     },
+    {
+     "name":"Chair","type": "obstacle", "centerX": -200, "centerY": -1040, "length": 90, "width": 150, "rotation": 90
+     },
+    {
+     "name":"Chair","type": "obstacle", "centerX": -65, "centerY": -1040, "length": 90, "width": 100, "rotation": 90
      }
   ]
 }

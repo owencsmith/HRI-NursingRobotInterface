@@ -39,6 +39,7 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.RobotShapes = []
         self.RobotNames = []
         self.RoomNames = []
+        self.ObstacleList = []
         self.previousMapRotation = 0
         self.numberOfObstacleGroupings = 64
         self.obstacleWarningDistance = 1.0 #in Meters
@@ -57,6 +58,7 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.mainCamUpdateSignal.connect(self.MainCamUpdate)
         self.secondaryCamUpdateSignal.connect(self.SecondaryCamUpdate)
         self.LaserScanUpdateSignal.connect(self.drawObstacleWarnings)
+        self.ToggleObstaclesCB.stateChanged.connect(self.obstacleComboBoxChanged)
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.augmentedRealityScene = QGraphicsScene()
@@ -75,6 +77,7 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.purple = QColor(qRgb(238, 130, 238))
         self.magenta = QColor(qRgb(255, 0, 255))
         self.white = QColor(qRgb(255, 255, 255))
+        self.gray = QColor(qRgb(119, 136, 153))
         self.loadMap(map)
         # Middleman communication stuff
         self.doneHelpingRobotPublisher = rospy.Publisher('/operator/done_helping', String, queue_size=10)
@@ -161,6 +164,22 @@ class OperatorUI(QtWidgets.QMainWindow):
                 label.setRotation(item["rotation"])
                 self.RoomNames.append(label)
                 self.scene.addItem(label)
+            elif (item["type"] == "obstacle"):
+                shape = QGraphicsRectItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
+                                          item["length"], item["width"])
+                shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
+                shape.setPen(QPen(self.gray))
+                shape.setBrush(QBrush(self.gray, Qt.SolidPattern))
+                shape.setRotation(item["rotation"])
+                self.ObstacleList.append(shape)
+            elif (item["type"] == "plant"):
+                shape = QGraphicsEllipseItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
+                                             item["length"], item["width"])
+                shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
+                shape.setPen(QPen(self.green))
+                shape.setBrush(QBrush(self.green, Qt.SolidPattern))
+                shape.setRotation(item["rotation"])
+                self.ObstacleList.append(shape)
         self.OperatorMap.scale(self.scaleFactor, self.scaleFactor)
 
     def robotStateCallback(self, message):
@@ -371,6 +390,14 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.robotWarningDistance = self.RobotWarningDistanceSLDR.value() / 2
         self.RobotWarningDistanceLBL.setText(str(self.robotWarningDistance) + " M")
 
+    def obstacleComboBoxChanged(self):
+        if self.ToggleObstaclesCB.isChecked():
+            for item in self.ObstacleList:
+                self.scene.addItem(item)
+        else:
+            for item in self.ObstacleList:
+                self.scene.removeItem(item)
+
     def fitToScreen(self, width, height):
         #The app should have the same aspect ratio regardless of the computer's
         #aspect ratio
@@ -390,6 +417,8 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.OperatorMap.resize(robotDescWidth, self.windowHeight*0.6)
         self.OperatorMap.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.OperatorMap.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.ToggleObstaclesCB.move(self.windowWidth * 0.01, self.windowHeight*0.55)
+        self.ToggleObstaclesCB.resize(self.windowWidth*0.2, self.windowHeight*0.05)
         ######## Description frame
         self.RobotDescriptionFrame.move(0, self.windowHeight*0.9-robotDescHeight)
         self.RobotDescriptionFrame.resize(robotDescWidth, robotDescHeight)

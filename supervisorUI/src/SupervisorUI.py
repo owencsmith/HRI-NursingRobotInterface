@@ -180,6 +180,14 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 shape.setBrush(QBrush(self.gray, Qt.SolidPattern))
                 shape.setRotation(item["rotation"])
                 self.ObstacleList.append(shape)
+            elif (item["type"]=="plant"):
+                shape = QGraphicsEllipseItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
+                                          item["length"], item["width"])
+                shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
+                shape.setPen(QPen(self.green))
+                shape.setBrush(QBrush(self.green, Qt.SolidPattern))
+                shape.setRotation(item["rotation"])
+                self.ObstacleList.append(shape)
         self.SupervisorMap.scale(self.scaleFactor, self.scaleFactor)
 
     def wheelEvent(self, event):
