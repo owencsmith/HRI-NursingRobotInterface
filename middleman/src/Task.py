@@ -1,7 +1,7 @@
 import time
 from middleman.msg import TaskMsg
 class Task:
-    def __init__(self, taskName, basePriority, robotName, X, Y, isPriorityRaised, variables):
+    def __init__(self, taskName, basePriority, robotName, X, Y, yaw, isPriorityRaised, variables = ""):
         self.taskName = taskName
         self.addedToQueue = time.time()
         self.priority_ = basePriority
@@ -9,6 +9,7 @@ class Task:
         self.variables = variables
         self.X = X
         self.Y = Y
+        self.yaw = yaw
         self.robotName = robotName
         self.priorityRaised = isPriorityRaised
 
@@ -28,6 +29,7 @@ class Task:
         taskMsg.ID = self.getID()
         taskMsg.X = self.X
         taskMsg.Y = self.Y
+        taskMsg.yaw = self.yaw
         taskMsg.taskPriority = self.getPriority()
         taskMsg.variables = self.variables
         taskMsg.isRaisedPriority = self.priorityRaised
