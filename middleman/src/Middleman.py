@@ -129,7 +129,7 @@ class Middleman():
         # passed as unassigned if task is not assigned
         robotName = dataList[1]
 
-        yaw = float(dataList[4])
+        yaw = -float(dataList[4])+np.pi
         raisePriority = dataList[5]
         if(raisePriority == "False"):
             priorityRaised = False
@@ -248,6 +248,9 @@ class Middleman():
          :return:  none
          """
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.currentTask = taskMsg
+        currentRobot.currentTaskName = taskMsg.taskName
+
         currentRobotOrient = currentRobot.pose.pose.pose.orientation
         quat_list = [currentRobotOrient.x, currentRobotOrient.y, currentRobotOrient.z,
                      currentRobotOrient.w]
@@ -271,7 +274,7 @@ class Middleman():
         poseStamped.header.frame_id = 'map'
 
         # add 90 deg for offset with UI. Our Z is out of the page, 0 is pointing left
-        q_orientation = quaternion_from_euler(0, 0, (-yaw) + np.pi)
+        q_orientation = quaternion_from_euler(0, 0, yaw)
 
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.x = q_orientation[0]
@@ -586,11 +589,19 @@ class Middleman():
                 self.reassignmentCounter = time.time()
 
     def checkNavStatus(self):
-        navTolerance = .1
+        posTolerance = .1
+        orientationTolerance = .3
         for robot in self.activeRobotDictionary.values():
             if(robot.currentTask.taskName == "NAV"):
-                if((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= navTolerance) and
-                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= navTolerance)):
+                quat = robot.pose.pose.pose.orientation
+                quat_list = [quat.x, quat.y, quat.z, quat.w]
+                robotEuler = euler_from_quaternion(quat_list)
+                robYaw = robotEuler[2]
+                print(abs(robYaw - robot.currentTask.yaw))
+
+                if((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
+                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and
+                        (abs(robYaw - robot.currentTask.yaw) <= orientationTolerance)):
                         # if we do via points, instead of IDLE task, send next position in via points list
                         info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
                         self.processTask(info_str)
@@ -604,5 +615,5 @@ while not rospy.is_shutdown():
     middleman.publishRobotsLeftInQueue()
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
-    #middleman.checkNavStatus()
+    middleman.checkNavStatus()
     middleman.rate.sleep()
