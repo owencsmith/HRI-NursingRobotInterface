@@ -8,6 +8,7 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from middleman.srv import TaskString, TaskStringResponse
 from Task import *
+from Operator import *
 import numpy as np
 
 # Todo: Change initialization of supervisor and operator publisher & subscriber
@@ -67,6 +68,9 @@ class Middleman():
         self.taskPriorityQueue = []
         # dictionary of all active robots
         self.activeRobotDictionary = {}
+        # dictionaty of all active operators
+        self.activeOperatorDictionary = {}
+
         # dictionary of all active robot amcl topics
         self.activeRobotAMCLTopics = {}
 
@@ -79,26 +83,24 @@ class Middleman():
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
         rospy.Subscriber("/supervisor/task", String, self.processTask)
+        rospy.Subscriber("/supervisor/removeTask", String, self.removeFromPriorityQueue)
         rospy.Subscriber("/operator/done_helping", String, self.advanceRobotHelpQueue)
         rospy.Subscriber("/operator/request_extra_views_from_robot", String, self.sendAnotherRobotForCameraViews)
+        rospy.Subscriber("/operator/release_help_robot", String, self.releaseFromHelp)
+        rospy.Subscriber("/operator/new_operator_ui", String, self.registerNewOperator)
         rospy.Subscriber("/robot/stuck", String, self.passRobotToQueueForOperator)
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
-        rospy.Subscriber("/operator/release_help_robot", String, self.releaseFromHelp)
-        rospy.Subscriber("/supervisor/removeTask", String, self.removeFromPriorityQueue)
+
         rospy.sleep(1)
 
         # publishers
-        self.sendNewRobotToOperator = rospy.Publisher('/operator/new_robot', Robot, queue_size=10)
-        self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool,
-                                                             queue_size=10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size=10)
         # self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.taskListPublisher = rospy.Publisher('/supervisor/taskList', TaskMsgArr, queue_size=10)
         self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size=10)
-        self.TellOperatorThatRobotCameraIsAvailable = rospy.Publisher('/operator/robotForExtraCamera', String, queue_size=10)
         rospy.sleep(1)
 
         # servers
@@ -237,7 +239,12 @@ class Middleman():
         currentRobot.currentTaskName = taskMsg.taskName
         print(taskMsg.variables)
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
-        self.TellOperatorThatRobotCameraIsAvailable.publish(taskMsg.robotName)
+
+        # check which operator needs help and doesn't have it?
+        for operator in self.activeOperatorDictionary.values():
+            if(operator.needHelpingRobot):
+                operator.TellOperatorThatRobotCameraIsAvailable.publish(taskMsg.robotName)
+                break
 
     # do nothing
     def idleTask(self, taskMsg):
@@ -250,6 +257,7 @@ class Middleman():
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
+        currentRobot.status = "OK"
 
         currentRobotOrient = currentRobot.pose.pose.pose.orientation
         quat_list = [currentRobotOrient.x, currentRobotOrient.y, currentRobotOrient.z,
@@ -309,16 +317,21 @@ class Middleman():
         # the task the robot was doing doesn't change in the taskMsg so the operator knows what the robot was doing.
         robotThatNeedsHelp.currentTaskName = "SOS"
         robotThatNeedsHelp.status = "OPC"
+
         self.robotsForOperator.append(robotThatNeedsHelp)
         self.robotsForOperator.sort(key=lambda robot: robot.currentTask.taskPriority)
 
-        # - check this boolean
-        #   if busy - pass
-        #   if idle - pop highest priority if list has content
-        if not self.operatorIsBusy:
-            robotToHelp = self.robotsForOperator.pop()
-            self.sendNewRobotToOperator.publish(robotToHelp)
-            self.operatorIsBusy = True
+        # determine which operator this goes to
+        for operator in self.activeOperatorDictionary.values():
+            # - check this boolean
+            #   if busy - pass
+            #   if idle - pop highest priority if list has content
+            if not operator.operatorIsBusy:
+                robotToHelp = self.robotsForOperator.pop()
+                operator.sendNewRobotToOperator.publish(robotToHelp)
+                operator.operatorIsBusy = True
+                operator.currentRobot = robotToHelp
+                break
 
     def advanceRobotHelpQueue(self, data):
         """
@@ -326,18 +339,24 @@ class Middleman():
         operator GUI
         :param data: the robot name that was previously being helped by the operator
         """
-        self.operatorIsBusy = False
 
         # parse robot name
         robotName = data.data
         robotThatWasHelped = self.activeRobotDictionary[robotName]
         # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
-        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, False, " ")
+        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, 0, False, " ")
         idleTaskMsg = idleTask.convertTaskToTaskMsg()
         robotThatWasHelped.currentTask = idleTaskMsg
         robotThatWasHelped.currentTaskName = idleTaskMsg.taskName
         self.idleTask(idleTaskMsg)
+        operatorThatWasHelping = None
+        # determine which operator this came from
+        for operator in self.activeOperatorDictionary.values():
+            if operator.currentRobot == robotThatWasHelped:
+                operator.operatorIsBusy = False
+                operatorThatWasHelping = operator
+                break
 
         # Find the robot that was helping (if any), assign it a new idle task
         for robot in self.activeRobotDictionary.values():
@@ -350,8 +369,9 @@ class Middleman():
         if len(self.robotsForOperator) > 0:
             robotToHelp = self.robotsForOperator.pop()
             print("Sending new robot: ", robotToHelp.name, " ,to operator.")
-            self.sendNewRobotToOperator.publish(robotToHelp)
-            self.operatorIsBusy = True
+            operatorThatWasHelping.sendNewRobotToOperator.publish(robotToHelp)
+            operatorThatWasHelping.operatorIsBusy = True
+            operatorThatWasHelping.currentRobot = robotToHelp
 
     def releaseFromHelp(self, data):
         # Find the robot that was helping (if any), assign it a new idle task
@@ -381,7 +401,14 @@ class Middleman():
         robotAvailableForHelp = False
         robotThatWillHelp = None
         # Is there an IDLE robot that CAN be used?
-        robotToNavigateTo = self.activeRobotDictionary[data.data.split()[0]]
+        robotToNavigateTo = self.activeRobotDictionary[data.data]
+
+        # find out which operator this robot came from
+        for operator in self.activeOperatorDictionary.values():
+            if operator.currentRobot == robotToNavigateTo:
+                operator.needHelpingRobot = True
+                break
+
         # grab the pose of the robot to navigate to
         robotToNavigateToPose = robotToNavigateTo.pose.pose.pose.position
         robotToNavigateToOrient = robotToNavigateTo.pose.pose.pose.orientation
@@ -467,6 +494,12 @@ class Middleman():
         # if the robot is not already in the dictionary
         if (newRobot.name not in self.activeRobotDictionary.keys()):
             self.activeRobotDictionary[newRobot.name] = newRobot
+
+    def registerNewOperator(self, data):
+        print("registering new operator: ", data.data)
+        newOperator = Operator(data.data)
+        self.activeOperatorDictionary[data.data] = newOperator
+        pass
 
     # every robot pose updates here
     # data is PoseWithCovarianceStamped
@@ -597,7 +630,6 @@ class Middleman():
                 quat_list = [quat.x, quat.y, quat.z, quat.w]
                 robotEuler = euler_from_quaternion(quat_list)
                 robYaw = robotEuler[2]
-                print(abs(robYaw - robot.currentTask.yaw))
 
                 if((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
                         (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and

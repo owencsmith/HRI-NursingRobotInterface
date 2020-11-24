@@ -27,7 +27,7 @@ class OperatorUI(QtWidgets.QMainWindow):
     secondaryCamUpdateSignal = pyqtSignal('PyQt_PyObject')
     LaserScanUpdateSignal = pyqtSignal('PyQt_PyObject')
 
-    def __init__(self, width, height):
+    def __init__(self, width, height, id):
         super(OperatorUI, self).__init__()
         self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
         self.fitToScreen(width, height)
@@ -90,9 +90,12 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.SecondaryCamSubscriber = rospy.Subscriber('none', Image, self.SecondaryCamSubscriberCallback)
         self.LaserScanSubscriber = rospy.Subscriber('none', LaserScan, self.LaserScanCallback)
         self.stateSubscriber = rospy.Subscriber('/operator/robotState', RobotArr, self.robotStateCallback)
-        self.newRobotSubscriber = rospy.Subscriber('/operator/new_robot', Robot, self.NewRobotCallback)
-        self.robotassignedForExtraCamera = rospy.Subscriber('/operator/robotForExtraCamera', String, self.SecondaryCamRecievedCallback )
+        self.newRobotSubscriber = rospy.Subscriber('/' + id + '/new_robot', Robot, self.NewRobotCallback)
+        self.robotassignedForExtraCamera = rospy.Subscriber('/' + id +'/robotForExtraCamera', String, self.SecondaryCamRecievedCallback )
         self.requestAnotherRobotForCameraViews= rospy.Publisher('/operator/request_extra_views_from_robot', String, queue_size=10)
+        self.newOperatorIDPublisher = rospy.Publisher('/operator/new_operator_ui', String, queue_size = 10)
+        rospy.sleep(1)
+        self.newOperatorIDPublisher.publish(id)
 
     def mapClickEventHandler(self, event):
         pass
@@ -488,11 +491,12 @@ class SecondCameraSlideInThread(QThread):
             self.signal.emit(x)
 
 if __name__ == '__main__':
-    rospy.init_node('OperatorUI')
+    nodeID = "operator_" + str(int(time.time()))
+    rospy.init_node(nodeID)
     rospy.sleep(.5)
     app = QApplication(sys.argv)
     screen = app.primaryScreen()#gets size of primary screen. This assumes the GUI is being run on the primary screen. If it is not and the secondary screen has a different resolution this will not scale correctly
     size = screen.size()
-    window = OperatorUI(size.width(), size.height())
+    window = OperatorUI(size.width(), size.height(), nodeID)
     window.show()
     sys.exit(app.exec_())
