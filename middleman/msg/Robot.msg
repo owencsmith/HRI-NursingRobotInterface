@@ -2,4 +2,6 @@ string name
 TaskMsg currentTask
 string currentTaskName
 string status
+string operatorID
+string supervisorID
 geometry_msgs/PoseWithCovarianceStamped pose

@@ -244,6 +244,8 @@ class Middleman():
         for operator in self.activeOperatorDictionary.values():
             if(operator.needHelpingRobot):
                 operator.TellOperatorThatRobotCameraIsAvailable.publish(taskMsg.robotName)
+                # link the helping robot to the operator
+                operator.linkToHelpingRobot(currentRobot)
                 break
 
     # do nothing
@@ -330,7 +332,7 @@ class Middleman():
                 robotToHelp = self.robotsForOperator.pop()
                 operator.sendNewRobotToOperator.publish(robotToHelp)
                 operator.operatorIsBusy = True
-                operator.currentRobot = robotToHelp
+                operator.linkToRobot(robotToHelp)
                 break
 
     def advanceRobotHelpQueue(self, data):
@@ -350,19 +352,19 @@ class Middleman():
         robotThatWasHelped.currentTask = idleTaskMsg
         robotThatWasHelped.currentTaskName = idleTaskMsg.taskName
         self.idleTask(idleTaskMsg)
-        operatorThatWasHelping = None
-        # determine which operator this came from
-        for operator in self.activeOperatorDictionary.values():
-            if operator.currentRobot == robotThatWasHelped:
-                operator.operatorIsBusy = False
-                operatorThatWasHelping = operator
-                break
 
-        # Find the robot that was helping (if any), assign it a new idle task
+        # determine which operator this came from, set it to not helping
+        operatorThatWasHelping = self.activeOperatorDictionary[robotThatWasHelped.operatorID]
+        operatorThatWasHelping.operatorIsBusy = False
+        operatorThatWasHelping.unlinkFromRobot(robotThatWasHelped)
+
+
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
-            if robot.currentTaskName == "HLP":
+            if robot.currentTaskName == "HLP" and (robot.operatorID == operatorThatWasHelping.operatorID):
                 info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+                # unlink operator from helping robot
+                operatorThatWasHelping.unlinkFromHelpingRobot(robot)
                 self.processTask(info_str)
                 break
 
@@ -371,16 +373,15 @@ class Middleman():
             print("Sending new robot: ", robotToHelp.name, " ,to operator.")
             operatorThatWasHelping.sendNewRobotToOperator.publish(robotToHelp)
             operatorThatWasHelping.operatorIsBusy = True
-            operatorThatWasHelping.currentRobot = robotToHelp
+            operatorThatWasHelping.linkToRobot(robotToHelp)
 
     def releaseFromHelp(self, data):
-        # Find the robot that was helping (if any), assign it a new idle task
-        for robot in self.activeRobotDictionary.values():
-            # check for IDLE robots
-            if robot.currentTaskName == "HLP":
-                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
-                self.processTask(info_str)
-                break
+        robotThatWasHelping = self.activeRobotDictionary[data.data]
+        info_str = 'IDLE' + ' ' + robotThatWasHelping.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+        operatorThatWasUsingTheRobot = self.activeOperatorDictionary[robotThatWasHelping.operatorID]
+        operatorThatWasUsingTheRobot.unlinkFromHelpingRobot(robotThatWasHelping)
+        operatorThatWasUsingTheRobot.needHelpingRobot = False
+        self.processTask(info_str)
 
     def removeFromPriorityQueue(self, data):
         ID = data.data
@@ -404,10 +405,8 @@ class Middleman():
         robotToNavigateTo = self.activeRobotDictionary[data.data]
 
         # find out which operator this robot came from
-        for operator in self.activeOperatorDictionary.values():
-            if operator.currentRobot == robotToNavigateTo:
-                operator.needHelpingRobot = True
-                break
+        operatorAskingForHelp = self.activeOperatorDictionary[robotToNavigateTo.operatorID]
+        operatorAskingForHelp.needHelpingRobot = True
 
         # grab the pose of the robot to navigate to
         robotToNavigateToPose = robotToNavigateTo.pose.pose.pose.position
@@ -422,7 +421,7 @@ class Middleman():
         robotToNavigateToY = robotToNavigateToPose.y - yBuffer
 
         # todo, try and fix this now....
-        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + str(robYaw+(5*np.pi/4)) + ' ' + 'False' + ' '
+        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + str(robYaw+(7*np.pi/4)) + ' ' + 'False' + ' '
 
         print(info_str)
         self.processTask(info_str)
@@ -476,6 +475,8 @@ class Middleman():
         newRobot = Robot()
         newRobot.name = data.data
         newRobot.status = "OK"
+        newRobot.operatorID = ""
+        newRobot.supervisorID = ""
 
         initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, 0, False, " ")
         initialTaskMsg = initialTask.convertTaskToTaskMsg()
@@ -500,6 +501,11 @@ class Middleman():
         newOperator = Operator(data.data)
         self.activeOperatorDictionary[data.data] = newOperator
         pass
+
+    def findOperatorFromRobot(self, robot):
+        for operator in self.activeOperatorDictionary.values():
+            if(operator.currentRobot == robot):
+                return operator
 
     # every robot pose updates here
     # data is PoseWithCovarianceStamped

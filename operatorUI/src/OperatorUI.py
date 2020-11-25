@@ -120,7 +120,8 @@ class OperatorUI(QtWidgets.QMainWindow):
 
     def RequestCameraBTNCallback(self):
         if(self.secondCameraShowing):
-            self.releaseCameraPublisher.publish('Begone Thot')
+            # publish the name of the robot that was helping
+            self.releaseCameraPublisher.publish(self.helperRobot)
             self.helperRobot = None
             self.SecondaryCamSubscriber.unregister()
             self.Camera2.clear()
