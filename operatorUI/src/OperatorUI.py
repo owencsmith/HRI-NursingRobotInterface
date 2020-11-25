@@ -93,9 +93,19 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.newRobotSubscriber = rospy.Subscriber('/' + id + '/new_robot', Robot, self.NewRobotCallback)
         self.robotassignedForExtraCamera = rospy.Subscriber('/' + id +'/robotForExtraCamera', String, self.SecondaryCamRecievedCallback )
         self.requestAnotherRobotForCameraViews= rospy.Publisher('/operator/request_extra_views_from_robot', String, queue_size=10)
+
+        #New operator message for middleman
         self.newOperatorIDPublisher = rospy.Publisher('/operator/new_operator_ui', String, queue_size = 10)
+
+        #heartbeat stuff
+        rospy.Timer(rospy.Duration(.5), self.sendHeartBeat)
+        self.heartBeatPublisher = rospy.Publisher('/' + id + '/heartbeat', String, queue_size = 10)
         rospy.sleep(1)
         self.newOperatorIDPublisher.publish(id)
+
+
+    def sendHeartBeat(self, data):
+        self.heartBeatPublisher.publish("lubdub")
 
     def mapClickEventHandler(self, event):
         pass
@@ -492,7 +502,7 @@ class SecondCameraSlideInThread(QThread):
             self.signal.emit(x)
 
 if __name__ == '__main__':
-    nodeID = "operator_" + str(int(time.time()))
+    nodeID = "operatorUI_" + str(int(time.time()))
     rospy.init_node(nodeID)
     rospy.sleep(.5)
     app = QApplication(sys.argv)

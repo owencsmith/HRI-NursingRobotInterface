@@ -88,6 +88,7 @@ class Middleman():
         rospy.Subscriber("/operator/request_extra_views_from_robot", String, self.sendAnotherRobotForCameraViews)
         rospy.Subscriber("/operator/release_help_robot", String, self.releaseFromHelp)
         rospy.Subscriber("/operator/new_operator_ui", String, self.registerNewOperator)
+        rospy.Subscriber("/operator/seppuku", String, self.unregisterOperator)
         rospy.Subscriber("/robot/stuck", String, self.passRobotToQueueForOperator)
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
@@ -310,7 +311,6 @@ class Middleman():
         """
         if robotName == 'unassigned':
             return
-        print("Passing robot: ", robotName, " to operator")
         # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
         # change status to OPC
@@ -333,7 +333,9 @@ class Middleman():
                 operator.sendNewRobotToOperator.publish(robotToHelp)
                 operator.operatorIsBusy = True
                 operator.linkToRobot(robotToHelp)
+                print("Passing robot: " + robotToHelp.name + " to operator: " + operator.operatorID)
                 break
+
 
     def advanceRobotHelpQueue(self, data):
         """
@@ -497,10 +499,44 @@ class Middleman():
             self.activeRobotDictionary[newRobot.name] = newRobot
 
     def registerNewOperator(self, data):
-        print("registering new operator: ", data.data)
+        print("registering new operator: " + data.data)
         newOperator = Operator(data.data)
         self.activeOperatorDictionary[data.data] = newOperator
+        # Check the robotsForOperatorQueue to see if there are robots that need help
+        if(len(self.robotsForOperator) > 0):
+            robotToHelp = self.robotsForOperator.pop()
+            newOperator.sendNewRobotToOperator.publish(robotToHelp)
+            newOperator.operatorIsBusy = True
+            newOperator.linkToRobot(robotToHelp)
+            print("Passing robot: " + robotToHelp.name + " to operator: " + newOperator.operatorID)
+
         pass
+
+    def unregisterOperator(self, data):
+        # remove the object from the dictionary
+        print(data.data + " died an honorable death.")
+        operator =  self.activeOperatorDictionary[data.data]
+        # check to see if the operator is working on any robots
+        if(operator.currentRobot is not None):
+            #   put it back into the robots for operator queue, don't make it IDLE. It still needs help
+            self.robotsForOperator.append(operator.currentRobot)
+            self.robotsForOperator.sort(key=lambda robot: robot.currentTask.taskPriority)
+            #   unlink them from the robot
+            operator.unlinkFromRobot(operator.currentRobot)
+        # if there's a helping robot, unlink them from that, make it IDLE
+        if (operator.currentHelpingRobot is not None):
+            robotThatWasHelping = operator.currentHelpingRobot
+            info_str = 'IDLE' + ' ' + robotThatWasHelping.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+            operatorThatWasUsingTheRobot = self.activeOperatorDictionary[robotThatWasHelping.operatorID]
+            operatorThatWasUsingTheRobot.unlinkFromHelpingRobot(robotThatWasHelping)
+            operatorThatWasUsingTheRobot.needHelpingRobot = False
+            self.processTask(info_str)
+
+        del operator
+        del self.activeOperatorDictionary[data.data]
+        print("Unregistered " + data.data)
+
+
 
     def findOperatorFromRobot(self, robot):
         for operator in self.activeOperatorDictionary.values():
