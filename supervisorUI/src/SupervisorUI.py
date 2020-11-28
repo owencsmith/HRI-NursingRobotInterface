@@ -29,11 +29,12 @@ class SupervisorUI(QtWidgets.QMainWindow):
     taskUpdateSignal = pyqtSignal('PyQt_PyObject')
     robotTaskChangeSignal = pyqtSignal('PyQt_PyObject')
     CamUpdateSignal = pyqtSignal('PyQt_PyObject')
-    def __init__(self, width, height):
+    def __init__(self, width, height, id):
         super(SupervisorUI, self).__init__()
         self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
         self.slideInMenuWidth = 0 # these all get set by fitToScreen method
         self.windowHeight = 0
+        self.id = id
         self.windowWidth = 0
         self.mapWidth = 0
         self.numAnimationSteps = 20
@@ -57,9 +58,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.robotTaskChangeSignal.connect(self.taskChangeMainThreadCallback)
         self.taskUpdateSignal.connect(self.taskListCallback)
         self.CamUpdateSignal.connect(self.CamUpdate)
-        self.stateSubscriber = rospy.Subscriber('/supervisor/robotState', RobotArr, self.robotStateCallback)
-        self.taskSubscriber = rospy.Subscriber('/supervisor/taskList', TaskMsgArr, self.taskListRosCallback)
-        self.taskChangeSubscriber = rospy.Subscriber('/supervisor/taskReassignment', TaskMsgArr, self.taskChangeCallback)
+        self.stateSubscriber = rospy.Subscriber('/' + id +'/robotState', RobotArr, self.robotStateCallback)
+        self.taskSubscriber = rospy.Subscriber('/' + id + '/taskList', TaskMsgArr, self.taskListRosCallback)
+        self.taskChangeSubscriber = rospy.Subscriber('/' + id + '/taskReassignment', TaskMsgArr, self.taskChangeCallback)
         self.taskPublisher = rospy.Publisher("/supervisor/task", String, queue_size=10)
         self.deleteTaskPublisher = rospy.Publisher("/supervisor/removeTask", String, queue_size=10)
         self.CamSubscriber = rospy.Subscriber('none', Image, self.CamRosCallback)
@@ -100,6 +101,18 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.loadMap(map)
         self.SideMenuShowing = False
         self.SetUpTable()
+        #New supervisor message for middleman
+        self.newSupervisorIDPublisher = rospy.Publisher('/supervisor/new_supervisor_ui', String, queue_size = 10)
+
+        #heartbeat stuff
+        rospy.Timer(rospy.Duration(.5), self.sendHeartBeat)
+        self.heartBeatPublisher = rospy.Publisher('/' + id + '/heartbeat', String, queue_size = 10)
+        rospy.sleep(1)
+        self.newSupervisorIDPublisher.publish(id)
+
+
+    def sendHeartBeat(self, data):
+        self.heartBeatPublisher.publish("lubdub")
 
     def ToggleSideMenu(self):
         if not self.SideMenuShowing:
@@ -420,7 +433,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.ErrorLBL.show()
             else:
                 yaw = str(math.radians(self.poseYaw))
-                self.taskPublisher.publish(self.RobotTasksToCode[
+                self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[
                                                self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
                     self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " +yaw+" "+ str(self.raisePriorityBox.isChecked()))
                 if self.LocationPicked:
@@ -441,7 +454,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.LocationPicked = False
         else:
             yaw = str(math.radians(self.poseYaw))
-            self.taskPublisher.publish(self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " +
+            self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " +
                                        str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) + " " + yaw + " " + str(self.raisePriorityBox.isChecked()))
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
@@ -633,11 +646,12 @@ class SideMenuThread(QThread):
             self.signal.emit(x)
 
 if __name__ == '__main__':
-    rospy.init_node('SupervisorUI')
+    nodeID = "supervisorUI_" + str(int(time.time()))
+    rospy.init_node(nodeID)
     rospy.sleep(.5)
     app = QApplication(sys.argv)
     screen = app.primaryScreen()
     size = screen.size()
-    window = SupervisorUI(size.width(), size.height())
+    window = SupervisorUI(size.width(), size.height(), nodeID)
     window.show()
     sys.exit(app.exec_())

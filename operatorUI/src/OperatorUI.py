@@ -117,7 +117,7 @@ class OperatorUI(QtWidgets.QMainWindow):
         self.TaskHereLBL.setText("")
         self.RequestCameraBTN.setEnabled(False)
         self.currentRobot =None
-        self.helperRobot = None
+        #self.helperRobot = None
         self.MainCamSubscriber.unregister()
         self.SecondaryCamSubscriber.unregister()
         self.LaserScanSubscriber.unregister()
