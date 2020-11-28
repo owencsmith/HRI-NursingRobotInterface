@@ -393,10 +393,10 @@ class Middleman():
     def removeFromPriorityQueue(self, data):
         ID = data.data
         print("ID: ", data.data)
-        # remove from the task priority list the task with this ID
-        for i, task in enumerate(self.taskPriorityQueue):
-            if(task.getID() == ID):
-                self.taskPriorityQueue.remove(task)
+        for supervisor in self.activeSupervisorDictionary.values():
+            for i, task in enumerate(supervisor.taskPriorityQueue):
+                if(task.getID() == ID):
+                    supervisor.taskPriorityQueue.remove(task)
 
     # TODO: add help task to the priority queue or active queue
     def sendAnotherRobotForCameraViews(self, data):
@@ -711,7 +711,7 @@ class Middleman():
                             # add previously active task to priority queue
                             supervisor.taskPriorityQueue.append(lowestPriorityTask)
 
-        self.reassignmentCounter = time.time()
+                    self.reassignmentCounter = time.time()
 
     def checkNavStatus(self):
         posTolerance = .1
