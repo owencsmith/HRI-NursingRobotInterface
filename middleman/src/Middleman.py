@@ -101,6 +101,7 @@ class Middleman():
         rospy.sleep(1)
 
         # publishers
+        self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size=10)
         # self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
@@ -452,7 +453,7 @@ class Middleman():
         #     self.taskPriorityQueue.append(helpTask)
 
 
-    def sendTaskCodesToSupervisor(self, req):
+    def     sendTaskCodesToSupervisor(self, req):
         """
         A boot message that provides color display infor and task type to the supervisor UI
         :param req:
@@ -535,9 +536,9 @@ class Middleman():
         print(data.data + " died an honorable death.")
         supervisor =  self.activeSupervisorDictionary[data.data]
         #handle distribution of robots here
-
         del supervisor
         del self.activeSupervisorDictionary[data.data]
+        self.distributeRobotsToSupervisor()
         print("Unregistered " + data.data)
 
     def unregisterOperator(self, data):
@@ -568,6 +569,10 @@ class Middleman():
     def distributeRobotsToSupervisor(self):
         # go through the robots and assign one at a time
         supervisorList = list(self.activeSupervisorDictionary.values())
+        if(len(supervisorList) == 0):
+            for i, robot in enumerate(self.activeRobotDictionary.values()):
+                robot.supervisorID = ''
+            return
         for supervisor in self.activeSupervisorDictionary.values():
             supervisor.activeRobotDictionary = {}
         for i, robot in enumerate(self.activeRobotDictionary.values()):
@@ -603,24 +608,20 @@ class Middleman():
         Publishes the states of the robots in the robot list tracked by the middleman to the supervisor and operator in
         one compact message
         """
-        robotListForOperator = RobotArr()
-        for supervisor in self.activeSupervisorDictionary.values():
-            # ask each robot to publish
-            robotListForSupervisor = RobotArr()
-            for robot in supervisor.activeRobotDictionary.values():
-                try:
-                    pose_msg = rospy.wait_for_message(self.activeRobotAMCLTopics[robot.name], PoseWithCovarianceStamped,
-                                                      .05)
-                    robot.pose = pose_msg
-                except:
-                    pass
-                robotListForSupervisor.robots.append(robot)
-                robotListForOperator.robots.append(robot)
-            supervisor.statePublisherForSupervisor.publish(robotListForSupervisor)
-                #print(type(robot.currentTask.variables))
+        # ask each robot to publish
+        robotList = RobotArr()
+        for robot in self.activeRobotDictionary.values():
+            try:
+                pose_msg = rospy.wait_for_message(self.activeRobotAMCLTopics[robot.name], PoseWithCovarianceStamped,
+                                                  .05)
+                robot.pose = pose_msg
+            except:
+                pass
+            robotList.robots.append(robot)
+            # print(type(robot.currentTask.variables))
 
-
-        self.statePublisherForOperator.publish(robotListForOperator)
+        self.statePublisherForOperator.publish(robotList)
+        self.statePublisherForSupervisor.publish(robotList)
 
     def assignIdleRobots(self):
         """
@@ -663,7 +664,7 @@ class Middleman():
         for supervisor in self.activeSupervisorDictionary.values():
             taskMsgList = TaskMsgArr()
             supervisor.taskPriorityQueue.sort(key=lambda t: t.getPriority())
-            for task in (self.activeTaskList + self.taskPriorityQueue):
+            for task in (supervisor.activeTaskList + supervisor.taskPriorityQueue):
                 # turn object into Msg type to publish
                 taskMsg = task.convertTaskToTaskMsg()
                 taskMsgList.taskMsgs.append(taskMsg)

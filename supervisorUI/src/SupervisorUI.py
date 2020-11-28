@@ -41,7 +41,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.fitToScreen(width, height)
         self.RobotShapes = []
         self.LocationTargetShapes = []
-        self.RobotNames = []
+        self.AllRobotNames = []
+        self.SupervisorSpecificRobotNames = []
         self.RobotTasks = {}
         self.GoalTarget = []
         self.ObstacleList = []
@@ -58,7 +59,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.robotTaskChangeSignal.connect(self.taskChangeMainThreadCallback)
         self.taskUpdateSignal.connect(self.taskListCallback)
         self.CamUpdateSignal.connect(self.CamUpdate)
-        self.stateSubscriber = rospy.Subscriber('/' + id +'/robotState', RobotArr, self.robotStateCallback)
+        self.stateSubscriber = rospy.Subscriber('/supervisor/robotState', RobotArr, self.robotStateCallback)
         self.taskSubscriber = rospy.Subscriber('/' + id + '/taskList', TaskMsgArr, self.taskListRosCallback)
         self.taskChangeSubscriber = rospy.Subscriber('/' + id + '/taskReassignment', TaskMsgArr, self.taskChangeCallback)
         self.taskPublisher = rospy.Publisher("/supervisor/task", String, queue_size=10)
@@ -121,7 +122,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.taskComboBoxChanged()
             self.SelectRobot.clear()
             self.SelectRobot.addItem("unassigned")
-            for item in self.RobotNames:
+            for item in self.SupervisorSpecificRobotNames:
                 self.SelectRobot.addItem(item)
             self.XLocLabel.setText("X:")
             self.YLocLabel.setText("Y:")
@@ -227,23 +228,31 @@ class SupervisorUI(QtWidgets.QMainWindow):
         for item in self.RobotShapes:
             self.scene.removeItem(item)
         self.RobotShapes.clear()
-        self.RobotNames.clear()
+        self.AllRobotNames.clear()
+        self.SupervisorSpecificRobotNames.clear()
         for item in result.robots:
-            self.RobotListTable.insertRow(self.RobotListTable.rowCount())
-            self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 0, QTableWidgetItem(item.name))
-            self.RobotListTable.setItem(self.RobotListTable.rowCount()-1, 1, QTableWidgetItem(item.currentTaskName))
-            self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 2, QTableWidgetItem(item.status))
-            icon_item = QTableWidgetItem()
-            icon_item.setIcon(QIcon(cameraIcon))
-            self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 3, icon_item)
             obSize = 70
             shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
-            color = QColor(self.RobotTasks[item.currentTaskName][2])
-            shape.setBrush(QBrush(color, Qt.SolidPattern))
+            # separate the robots by "all" and "supervisor specific"
+            if (item.supervisorID == self.id):
+                self.SupervisorSpecificRobotNames.append(item.name)
+                color = QColor(self.RobotTasks[item.currentTaskName][2])
+                shape.setBrush(QBrush(color, Qt.SolidPattern))
+                self.RobotListTable.insertRow(self.RobotListTable.rowCount())
+                self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 0, QTableWidgetItem(item.name))
+                self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 1,
+                                            QTableWidgetItem(item.currentTaskName))
+                self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 2, QTableWidgetItem(item.status))
+                icon_item = QTableWidgetItem()
+                icon_item.setIcon(QIcon(cameraIcon))
+                self.RobotListTable.setItem(self.RobotListTable.rowCount() - 1, 3, icon_item)
+            else:
+                color = QColor(self.RobotTasks[item.currentTaskName][2])
+                shape.setBrush(QBrush(color, Qt.Dense3Pattern))
             self.scene.addItem(shape)
             self.RobotShapes.append(shape)
-            self.RobotNames.append(item.name)
+            self.AllRobotNames.append(item.name)
             label = QGraphicsTextItem(item.name)
             label.setX(int(item.pose.pose.pose.position.x*100))
             label.setY(-int(item.pose.pose.pose.position.y*100+obSize*1.2))
@@ -447,7 +456,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.raisePriorityBox.setChecked(False)
                 self.SelectRobot.clear()
                 self.SelectRobot.addItem("unassigned")
-                for item in self.RobotNames:
+                for item in self.SupervisorSpecificRobotNames:
                     self.SelectRobot.addItem(item)
                 self.XLocLabel.setText("X:")
                 self.YLocLabel.setText("Y:")
@@ -467,7 +476,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.raisePriorityBox.setChecked(False)
             self.SelectRobot.clear()
             self.SelectRobot.addItem("unassigned")
-            for item in self.RobotNames:
+            for item in self.SupervisorSpecificRobotNames:
                 self.SelectRobot.addItem(item)
             self.XLocLabel.setText("X:")
             self.YLocLabel.setText("Y:")
