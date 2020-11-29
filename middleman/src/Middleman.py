@@ -77,6 +77,8 @@ class Middleman():
         # dictionary of all active robot amcl topics
         self.activeRobotAMCLTopics = {}
 
+        self.unassignedTasks = []
+
         # operator queue
         self.robotsForOperator = []
         self.operatorIsBusy = False
@@ -498,7 +500,7 @@ class Middleman():
         initialTaskMsg = initialTask.convertTaskToTaskMsg()
         newRobot.currentTaskName = initialTaskMsg.taskName
         newRobot.currentTask = initialTaskMsg
-
+        self.unassignedTasks.append(initialTask)
         # newRobot.name+
         # print(newRobot.name+'/amcl_pose')
         if newRobot.name == 'trina2':
@@ -526,6 +528,10 @@ class Middleman():
     def registerNewSupervisor(self, data):
         print("registering new operator: " + data.data)
         newSupervisor = Supervisor(data.data)
+        # if a brand new supervisor exists and its the only, give them the tasks of the robots to start
+        if(len(self.activeSupervisorDictionary.values()) == 0):
+            newSupervisor.activeTaskList = self.unassignedTasks
+            del self.activeTaskList[:]
         self.activeSupervisorDictionary[data.data] = newSupervisor
         # handle distribution of robots here
         self.distributeRobotsToSupervisor()
@@ -579,6 +585,14 @@ class Middleman():
             supervisor = supervisorList[(i % len(self.activeSupervisorDictionary.values()))]
             supervisor.activeRobotDictionary[robot.name] = robot
             robot.supervisorID = supervisor.supervisorID
+
+        # TODO: have to distribute the tasks in the priorityQueue to the other superviors and the activeTaskList...
+        #  clear activeTaskList. When we place a robot in a supervisors dictionary (after clearing it), we convert the
+        #  taskmsg to task and add it to activeTaskList for that supervisor. When a new supervisor is created, don't
+        #  shuffle around the PQ. If a supervisor was killed, we take their priority queue, pass it into the function.
+        #  And then for each of the rest of the supervisors, round robin convert to task object and append to
+        #  their respective PQs
+
 
 
 
