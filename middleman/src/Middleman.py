@@ -134,7 +134,8 @@ class Middleman():
         else:
             dataList = data.data.split()
 
-        supervisor = self.activeSupervisorDictionary[dataList[0]]
+        supervisorID = dataList[0]
+        supervisor = self.activeSupervisorDictionary[supervisorID]
         taskName = dataList[1]
         # passed as unassigned if task is not assigned
         robotName = dataList[2]
@@ -158,7 +159,7 @@ class Middleman():
         if (taskName != 'SOS'):
             X = float(dataList[3])
             Y = float(dataList[4])
-            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised)
+            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised, supervisorID)
             newTaskMsg = newTask.convertTaskToTaskMsg()
             if robotName != "unassigned":
                 # remove current task form active task list
@@ -496,7 +497,7 @@ class Middleman():
         newRobot.operatorID = ""
         newRobot.supervisorID = ""
 
-        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, 0, False, " ")
+        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, 0, False, " ", " ")
         initialTaskMsg = initialTask.convertTaskToTaskMsg()
         newRobot.currentTaskName = initialTaskMsg.taskName
         newRobot.currentTask = initialTaskMsg
@@ -530,6 +531,9 @@ class Middleman():
         newSupervisor = Supervisor(data.data)
         # if a brand new supervisor exists and its the only, give them the tasks of the robots to start
         if(len(self.activeSupervisorDictionary.values()) == 0):
+            # record the OG ID
+            for task in self.unassignedTasks:
+                task.OGSupervisorID = newSupervisor.supervisorID
             newSupervisor.activeTaskList = self.unassignedTasks
             del self.activeTaskList[:]
         self.activeSupervisorDictionary[data.data] = newSupervisor
