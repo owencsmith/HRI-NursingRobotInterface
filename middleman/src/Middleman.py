@@ -333,7 +333,7 @@ class Middleman():
         robotThatWasHelped = self.activeRobotDictionary[robotName]
         # This gets published, no need to update supervisor
         robotThatWasHelped.status = "OK"
-        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, False, " ")
+        idleTask = Task("IDLE", self.taskPrios["IDLE"], robotThatWasHelped.name, 0, 0, 0, False, " ")
         idleTaskMsg = idleTask.convertTaskToTaskMsg()
         robotThatWasHelped.currentTask = idleTaskMsg
         robotThatWasHelped.currentTaskName = idleTaskMsg.taskName
