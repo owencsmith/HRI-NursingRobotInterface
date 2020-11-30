@@ -122,14 +122,17 @@ class Middleman():
                      i.e. <task name> <robot name> <X coordinate> <Y coordinate>
         :return None
         """
-
         # Have to know if the task has been unnassigned
         # have to know what the task is
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
         if type(data) == str:
             dataList = data.split()
+            if (data == ""):
+                return
         else:
+            if(data.data == ""):
+                return
             dataList = data.data.split()
 
         supervisorID = dataList[0]
@@ -426,7 +429,7 @@ class Middleman():
         robotToNavigateToY = robotToNavigateToPose.y - yBuffer
 
         supervisorWhosRobotIsStuck = self.activeSupervisorDictionary[robotToNavigateTo.supervisorID]
-
+        info_str = ""
         # send it to the supervisor that issued a stuck request if the supervisor has more than 1 robot to work with
         if (len(supervisorWhosRobotIsStuck.activeRobotDictionary.values()) > 1):
             info_str = supervisorWhosRobotIsStuck.supervisorID + ' ' + 'HLP' + ' ' + 'unassigned ' + str(
@@ -521,9 +524,11 @@ class Middleman():
                 task.OGSupervisorID = newSupervisor.supervisorID
             for robot in self.activeRobotDictionary.values():
                 robot.supervisorID = newSupervisor.supervisorID
+                newSupervisor.activeRobotDictionary[robot.name] = robot
             newSupervisor.taskPriorityQueue = self.unsupervisedTasks
             del self.unsupervisedTasks[:]
             self.activeSupervisorDictionary[data.data] = newSupervisor
+
         else:
             print('Scatter the fleet')
             # handle distribution of robots here
