@@ -23,18 +23,7 @@ class Task:
     def getID(self):
         return str(self.addedToQueue) + "_" + str(self.X) + "_" + str(self.Y)
 
-    # I think this will work?
-    def convertTaskMsgToTask(self, taskMsg):
-        #calculate basePriority
-        timeElapsed = (time.time()-taskMsg.timeAdded) / 60
-        if(taskMsg.isRaisedPriority == True):
-            basePriority =  round(int(taskMsg.taskPriority/(timeElapsed*1.5)))
-        else:
-            basePriority = round(int(taskMsg.taskPriority / timeElapsed))
 
-        return Task(taskMsg.taskName, basePriority, taskMsg.robotName,
-                    taskMsg.X, taskMsg.Y, taskMsg.yaw, taskMsg.isRaisedPriority, taskMsg.OGSupervisorID,
-                    taskMsg.variables)
 
     def convertTaskToTaskMsg(self):
         taskMsg = TaskMsg()

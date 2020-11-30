@@ -311,6 +311,12 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     icon_item = QTableWidgetItem()
                     icon_item.setIcon(QIcon(trashIcon))
                     self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 3, icon_item)
+                    if item.OGSupervisorID != self.id:
+                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 0).setBackground(QColor(245, 167, 66))
+                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 1).setBackground(QColor(245, 167, 66))
+                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 2).setBackground(QColor(245, 167, 66))
+                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 3).setBackground(QColor(245, 167, 66))
+
 
     def taskListClickedCallback(self, row, col):
         if col !=3:

@@ -15,7 +15,7 @@ class Supervisor:
         self.taskReassignmentPublisher = rospy.Publisher('/' + supervisorID + '/taskReassignment', TaskMsgArr, queue_size=10)
 
         # Set and check heartbeat
-        self.checkHeartBeatTimer = rospy.Timer(rospy.Duration(2.5), self.checkHeartBeat)
+        self.checkHeartBeatTimer = rospy.Timer(rospy.Duration(5), self.checkHeartBeat)
         self.setHeartBeatSubscriber = rospy.Subscriber("/" + self.supervisorID + "/heartbeat", String, self.setHeartBeat)
 
         # Tell the middleman to kill me after 2.5 seconds of no heartbeat. supervisor publishes its own ID onto /operator/seppuku
