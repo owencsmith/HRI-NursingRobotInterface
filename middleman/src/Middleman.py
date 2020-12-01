@@ -51,8 +51,8 @@ class Middleman():
         self.taskPrios = {
             'NAV': 25,
             'CLN': 50,
-            'HLP': 100,
-            'DLV': 200,
+            'HLP': 200,
+            'DLV': 100,
             'IDLE': 0
         }
         self.taskFns = {
