@@ -7,3 +7,5 @@ float64 taskPriority
 string robotName
 string variables
 bool isRaisedPriority
+int64 timeAdded
+string OGSupervisorID

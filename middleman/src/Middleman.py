@@ -8,7 +8,10 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from middleman.srv import TaskString, TaskStringResponse
 from Task import *
+from Operator import *
+from Supervisor import *
 import numpy as np
+
 
 # Todo: Change initialization of supervisor and operator publisher & subscriber
 
@@ -20,11 +23,11 @@ import numpy as np
 # Todo: What happens if a new supervisor becomes active with already functioning robot team? Do we steal robots from
 #  other supervisor?
 
-#TODO: How to do Viapoints
-    # A list of nav tasks
-    # store it in variables for nav
-         # OR send a list of nav tasks
-    #
+# TODO: How to do Viapoints
+# A list of nav tasks
+# store it in variables for nav
+# OR send a list of nav tasks
+#
 
 # Todo: Should there be a minimum number of robots that a supervisor needs to actually 'log in'? e.g. 2 robots in
 #  fleet, 2 supervisors doesnt make sense
@@ -61,14 +64,18 @@ class Middleman():
         }
 
         self.reassignmentCounter = time.time()
-        # list of active tasks happening RN
-        self.activeTaskList = []
-        # list of tasks that are yet to be assigned
-        self.taskPriorityQueue = []
+
         # dictionary of all active robots
         self.activeRobotDictionary = {}
+        # dictionaty of all active operators
+        self.activeOperatorDictionary = {}
+        # dictionaty of all active supervisors
+        self.activeSupervisorDictionary = {}
+
         # dictionary of all active robot amcl topics
         self.activeRobotAMCLTopics = {}
+
+        self.unsupervisedTasks = []
 
         # operator queue
         self.robotsForOperator = []
@@ -79,26 +86,25 @@ class Middleman():
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
         rospy.Subscriber("/supervisor/task", String, self.processTask)
+        rospy.Subscriber("/supervisor/removeTask", String, self.removeFromPriorityQueue)
         rospy.Subscriber("/operator/done_helping", String, self.advanceRobotHelpQueue)
         rospy.Subscriber("/operator/request_extra_views_from_robot", String, self.sendAnotherRobotForCameraViews)
+        rospy.Subscriber("/operator/release_help_robot", String, self.releaseFromHelp)
+        rospy.Subscriber("/operator/new_operator_ui", String, self.registerNewOperator)
+        rospy.Subscriber("/operator/seppuku", String, self.unregisterOperator)
+        rospy.Subscriber("/supervisor/new_supervisor_ui", String, self.registerNewSupervisor)
+        rospy.Subscriber("/supervisor/seppuku", String, self.unregisterSupervisor)
         rospy.Subscriber("/robot/stuck", String, self.passRobotToQueueForOperator)
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
-        rospy.Subscriber("/operator/release_help_robot", String, self.releaseFromHelp)
-        rospy.Subscriber("/supervisor/removeTask", String, self.removeFromPriorityQueue)
+
         rospy.sleep(1)
 
         # publishers
-        self.sendNewRobotToOperator = rospy.Publisher('/operator/new_robot', Robot, queue_size=10)
-        self.robotIsAvailableForExtraViews = rospy.Publisher('/operator/robot_is_available_for_extra_views', Bool,
-                                                             queue_size=10)
+        self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size=10)
         # self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
-        self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
-        self.taskListPublisher = rospy.Publisher('/supervisor/taskList', TaskMsgArr, queue_size=10)
-        self.taskReassignmentPublisher = rospy.Publisher('/supervisor/taskReassignment', TaskMsgArr, queue_size=10)
-        self.TellOperatorThatRobotCameraIsAvailable = rospy.Publisher('/operator/robotForExtraCamera', String, queue_size=10)
         rospy.sleep(1)
 
         # servers
@@ -116,22 +122,28 @@ class Middleman():
                      i.e. <task name> <robot name> <X coordinate> <Y coordinate>
         :return None
         """
-
         # Have to know if the task has been unnassigned
         # have to know what the task is
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
         if type(data) == str:
             dataList = data.split()
+            if (data == ""):
+                return
         else:
+            if(data.data == ""):
+                return
             dataList = data.data.split()
-        taskName = dataList[0]
-        # passed as unassigned if task is not assigned
-        robotName = dataList[1]
 
-        yaw = -float(dataList[4])+np.pi
-        raisePriority = dataList[5]
-        if(raisePriority == "False"):
+        supervisorID = dataList[0]
+        supervisor = self.activeSupervisorDictionary[supervisorID]
+        taskName = dataList[1]
+        # passed as unassigned if task is not assigned
+        robotName = dataList[2]
+
+        yaw = -float(dataList[5]) + np.pi
+        raisePriority = dataList[6]
+        if (raisePriority == "False"):
             priorityRaised = False
         else:
             priorityRaised = True
@@ -146,22 +158,22 @@ class Middleman():
         #     variables = " "
 
         if (taskName != 'SOS'):
-            X = float(dataList[2])
-            Y = float(dataList[3])
-            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised)
+            X = float(dataList[3])
+            Y = float(dataList[4])
+            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised, supervisorID)
             newTaskMsg = newTask.convertTaskToTaskMsg()
             if robotName != "unassigned":
                 # remove current task form active task list
                 oldTaskMsg = self.activeRobotDictionary[robotName].currentTask
-                for task in self.activeTaskList:
+                for task in supervisor.activeTaskList:
                     if oldTaskMsg.ID == task.getID():
-                        self.activeTaskList.remove(task)
+                        supervisor.activeTaskList.remove(task)
                         break
                 self.taskFns[taskName](newTaskMsg)
-                self.activeTaskList.append(newTask)
+                supervisor.activeTaskList.append(newTask)
             else:
-                self.taskPriorityQueue.append(newTask)
-                self.taskPriorityQueue.sort(key=lambda task: task.getPriority())
+                supervisor.taskPriorityQueue.append(newTask)
+                supervisor.taskPriorityQueue.sort(key=lambda task: task.getPriority())
             print('Called Task Function')
         elif (taskName == 'SOS'):
             self.passRobotToQueueForOperator(robotName)
@@ -237,7 +249,14 @@ class Middleman():
         currentRobot.currentTaskName = taskMsg.taskName
         print(taskMsg.variables)
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
-        self.TellOperatorThatRobotCameraIsAvailable.publish(taskMsg.robotName)
+
+        # check which operator needs help and doesn't have it?
+        for operator in self.activeOperatorDictionary.values():
+            if (operator.needHelpingRobot):
+                operator.TellOperatorThatRobotCameraIsAvailable.publish(taskMsg.robotName)
+                # link the helping robot to the operator
+                operator.linkToHelpingRobot(currentRobot)
+                break
 
     # do nothing
     def idleTask(self, taskMsg):
@@ -250,6 +269,7 @@ class Middleman():
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
+        currentRobot.status = "OK"
 
         currentRobotOrient = currentRobot.pose.pose.pose.orientation
         quat_list = [currentRobotOrient.x, currentRobotOrient.y, currentRobotOrient.z,
@@ -300,7 +320,6 @@ class Middleman():
         """
         if robotName == 'unassigned':
             return
-        print("Passing robot: ", robotName, " to operator")
         # uses name to get robot object
         robotThatNeedsHelp = self.activeRobotDictionary[robotName]
         # change status to OPC
@@ -309,16 +328,22 @@ class Middleman():
         # the task the robot was doing doesn't change in the taskMsg so the operator knows what the robot was doing.
         robotThatNeedsHelp.currentTaskName = "SOS"
         robotThatNeedsHelp.status = "OPC"
+
         self.robotsForOperator.append(robotThatNeedsHelp)
         self.robotsForOperator.sort(key=lambda robot: robot.currentTask.taskPriority)
 
-        # - check this boolean
-        #   if busy - pass
-        #   if idle - pop highest priority if list has content
-        if not self.operatorIsBusy:
-            robotToHelp = self.robotsForOperator.pop()
-            self.sendNewRobotToOperator.publish(robotToHelp)
-            self.operatorIsBusy = True
+        # determine which operator this goes to
+        for operator in self.activeOperatorDictionary.values():
+            # - check this boolean
+            #   if busy - pass
+            #   if idle - pop highest priority if list has content
+            if not operator.operatorIsBusy:
+                robotToHelp = self.robotsForOperator.pop()
+                operator.sendNewRobotToOperator.publish(robotToHelp)
+                operator.operatorIsBusy = True
+                operator.linkToRobot(robotToHelp)
+                print("Passing robot: " + robotToHelp.name + " to operator: " + operator.operatorID)
+                break
 
     def advanceRobotHelpQueue(self, data):
         """
@@ -326,7 +351,6 @@ class Middleman():
         operator GUI
         :param data: the robot name that was previously being helped by the operator
         """
-        self.operatorIsBusy = False
 
         # parse robot name
         robotName = data.data
@@ -339,36 +363,40 @@ class Middleman():
         robotThatWasHelped.currentTaskName = idleTaskMsg.taskName
         self.idleTask(idleTaskMsg)
 
-        # Find the robot that was helping (if any), assign it a new idle task
+        # determine which operator this came from, set it to not helping
+        operatorThatWasHelping = self.activeOperatorDictionary[robotThatWasHelped.operatorID]
+        operatorThatWasHelping.operatorIsBusy = False
+        operatorThatWasHelping.unlinkFromRobot(robotThatWasHelped)
+
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
-            if robot.currentTaskName == "HLP":
-                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
-                self.processTask(info_str)
+            if robot.currentTaskName == "HLP" and (robot.operatorID == operatorThatWasHelping.operatorID):
+                # unlink operator from helping robot
+                operatorThatWasHelping.unlinkFromHelpingRobot(robot)
+                self.setRobotToIdle(robot)
                 break
 
         if len(self.robotsForOperator) > 0:
             robotToHelp = self.robotsForOperator.pop()
             print("Sending new robot: ", robotToHelp.name, " ,to operator.")
-            self.sendNewRobotToOperator.publish(robotToHelp)
-            self.operatorIsBusy = True
+            operatorThatWasHelping.sendNewRobotToOperator.publish(robotToHelp)
+            operatorThatWasHelping.operatorIsBusy = True
+            operatorThatWasHelping.linkToRobot(robotToHelp)
 
     def releaseFromHelp(self, data):
-        # Find the robot that was helping (if any), assign it a new idle task
-        for robot in self.activeRobotDictionary.values():
-            # check for IDLE robots
-            if robot.currentTaskName == "HLP":
-                info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
-                self.processTask(info_str)
-                break
+        robotThatWasHelping = self.activeRobotDictionary[data.data]
+        operatorThatWasUsingTheRobot = self.activeOperatorDictionary[robotThatWasHelping.operatorID]
+        operatorThatWasUsingTheRobot.unlinkFromHelpingRobot(robotThatWasHelping)
+        operatorThatWasUsingTheRobot.needHelpingRobot = False
+        self.setRobotToIdle(robotThatWasHelping)
 
     def removeFromPriorityQueue(self, data):
         ID = data.data
         print("ID: ", data.data)
-        # remove from the task priority list the task with this ID
-        for i, task in enumerate(self.taskPriorityQueue):
-            if(task.getID() == ID):
-                self.taskPriorityQueue.remove(task)
+        for supervisor in self.activeSupervisorDictionary.values():
+            for i, task in enumerate(supervisor.taskPriorityQueue):
+                if (task.getID() == ID):
+                    supervisor.taskPriorityQueue.remove(task)
 
     # TODO: add help task to the priority queue or active queue
     def sendAnotherRobotForCameraViews(self, data):
@@ -381,35 +409,40 @@ class Middleman():
         robotAvailableForHelp = False
         robotThatWillHelp = None
         # Is there an IDLE robot that CAN be used?
-        robotToNavigateTo = self.activeRobotDictionary[data.data.split()[0]]
+        robotToNavigateTo = self.activeRobotDictionary[data.data]
+
+        # find out which operator this robot came from
+        operatorAskingForHelp = self.activeOperatorDictionary[robotToNavigateTo.operatorID]
+        operatorAskingForHelp.needHelpingRobot = True
+
         # grab the pose of the robot to navigate to
         robotToNavigateToPose = robotToNavigateTo.pose.pose.pose.position
         robotToNavigateToOrient = robotToNavigateTo.pose.pose.pose.orientation
-        quat_list = [robotToNavigateToOrient.x, robotToNavigateToOrient.y, robotToNavigateToOrient.z, robotToNavigateToOrient.w]
+        quat_list = [robotToNavigateToOrient.x, robotToNavigateToOrient.y, robotToNavigateToOrient.z,
+                     robotToNavigateToOrient.w]
         robotEuler = euler_from_quaternion(quat_list)
         robYaw = robotEuler[2]
-        xBuffer = np.sin(robYaw)*1
-        yBuffer = np.cos(robYaw)*1
-        #print(robotEuler)
+        xBuffer = np.sin(robYaw) * 1
+        yBuffer = np.cos(robYaw) * 1
+        # print(robotEuler)
         robotToNavigateToX = robotToNavigateToPose.x - xBuffer
         robotToNavigateToY = robotToNavigateToPose.y - yBuffer
 
-        # todo, try and fix this now....
-        info_str = 'HLP' + ' ' + 'unassigned ' + str(robotToNavigateToX) + ' ' + str(robotToNavigateToY) + ' ' + str(robYaw+(5*np.pi/4)) + ' ' + 'False' + ' '
-
+        supervisorWhosRobotIsStuck = self.activeSupervisorDictionary[robotToNavigateTo.supervisorID]
+        info_str = ""
+        # send it to the supervisor that issued a stuck request if the supervisor has more than 1 robot to work with
+        if (len(supervisorWhosRobotIsStuck.activeRobotDictionary.values()) > 1):
+            info_str = supervisorWhosRobotIsStuck.supervisorID + ' ' + 'HLP' + ' ' + 'unassigned ' + str(
+                robotToNavigateToX) + ' ' + str(
+                robotToNavigateToY) + ' ' + str(robYaw + (7 * np.pi / 4)) + ' ' + 'False' + ' '
+        else:
+            for supervisor in self.activeSupervisorDictionary.values():
+                if (len(supervisor.activeRobotDictionary.values()) > 1):
+                    info_str = supervisor.supervisorID + ' ' + 'HLP' + ' ' + 'unassigned ' + str(
+                        robotToNavigateToX) + ' ' + str(
+                        robotToNavigateToY) + ' ' + str(robYaw + (7 * np.pi / 4)) + ' ' + 'False' + ' '
         print(info_str)
         self.processTask(info_str)
-        # # parse the string for the robot to navigate to for more views
-        # helpTask = Task("HLP", self.taskPrios["HLP"], robotThatWillHelp.name, robotToNavigateToX, robotToNavigateToY, None)
-        # helpTaskMsg = helpTask.convertTaskToTaskMsg()
-        # self.hlpTask(helpTaskMsg)
-
-
-        #
-        # if(not robotAvailableForHelp):
-        #     helpTask = Task("HLP", self.taskPrios["HLP"], "unassigned", robotToNavigateToX, robotToNavigateToY, None)
-        #     self.taskPriorityQueue.append(helpTask)
-
 
     def sendTaskCodesToSupervisor(self, req):
         """
@@ -449,13 +482,14 @@ class Middleman():
         newRobot = Robot()
         newRobot.name = data.data
         newRobot.status = "OK"
+        newRobot.operatorID = ""
+        newRobot.supervisorID = ""
 
-        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, 0, False, " ")
+        initialTask = Task("IDLE", self.taskPrios["IDLE"], newRobot.name, 0, 0, 0, False, " ", " ")
         initialTaskMsg = initialTask.convertTaskToTaskMsg()
         newRobot.currentTaskName = initialTaskMsg.taskName
         newRobot.currentTask = initialTaskMsg
-        self.activeTaskList.append(initialTask)
-
+        self.unsupervisedTasks.append(initialTask)
         # newRobot.name+
         # print(newRobot.name+'/amcl_pose')
         if newRobot.name == 'trina2':
@@ -467,6 +501,136 @@ class Middleman():
         # if the robot is not already in the dictionary
         if (newRobot.name not in self.activeRobotDictionary.keys()):
             self.activeRobotDictionary[newRobot.name] = newRobot
+
+    def registerNewOperator(self, data):
+        print("registering new operator: " + data.data)
+        newOperator = Operator(data.data)
+        self.activeOperatorDictionary[data.data] = newOperator
+        # Check the robotsForOperatorQueue to see if there are robots that need help
+        if (len(self.robotsForOperator) > 0):
+            robotToHelp = self.robotsForOperator.pop()
+            newOperator.sendNewRobotToOperator.publish(robotToHelp)
+            newOperator.operatorIsBusy = True
+            newOperator.linkToRobot(robotToHelp)
+            print("Passing robot: " + robotToHelp.name + " to operator: " + newOperator.operatorID)
+
+    def registerNewSupervisor(self, data):
+        print("registering new operator: " + data.data)
+        newSupervisor = Supervisor(data.data)
+        # if a brand new supervisor exists and its the only, give them the tasks of the robots to start
+        if (len(self.activeSupervisorDictionary.values()) == 0):
+            # record the OG ID
+            for task in self.unsupervisedTasks:
+                task.OGSupervisorID = newSupervisor.supervisorID
+            for robot in self.activeRobotDictionary.values():
+                robot.supervisorID = newSupervisor.supervisorID
+                newSupervisor.activeRobotDictionary[robot.name] = robot
+            newSupervisor.taskPriorityQueue = self.unsupervisedTasks
+            del self.unsupervisedTasks[:]
+            self.activeSupervisorDictionary[data.data] = newSupervisor
+
+        else:
+            print('Scatter the fleet')
+            # handle distribution of robots here
+            self.activeSupervisorDictionary[data.data] = newSupervisor
+            self.distributeRobotsToSupervisor()
+
+    def unregisterSupervisor(self, data):
+        # remove the object from the dictionary
+        print(data.data + " died an honorable death.")
+        supervisor = self.activeSupervisorDictionary[data.data]
+        # handle distribution of robots here
+        self.distributeDeadPriorityQueue(supervisor.taskPriorityQueue)
+        del self.activeSupervisorDictionary[data.data]
+        del supervisor
+        self.distributeRobotsToSupervisor()
+
+        print("Unregistered " + data.data)
+
+    def unregisterOperator(self, data):
+        # remove the object from the dictionary
+        print(data.data + " died an honorable death.")
+        operator = self.activeOperatorDictionary[data.data]
+        # check to see if the operator is working on any robots
+        if (operator.currentRobot is not None):
+            #   put it back into the robots for operator queue, don't make it IDLE. It still needs help
+            self.robotsForOperator.append(operator.currentRobot)
+            self.robotsForOperator.sort(key=lambda robot: robot.currentTask.taskPriority)
+            #   unlink them from the robot
+            operator.unlinkFromRobot(operator.currentRobot)
+        # if there's a helping robot, unlink them from that, make it IDLE
+        if (operator.currentHelpingRobot is not None):
+            robotThatWasHelping = operator.currentHelpingRobot
+            operatorThatWasUsingTheRobot = self.activeOperatorDictionary[robotThatWasHelping.operatorID]
+            operatorThatWasUsingTheRobot.unlinkFromHelpingRobot(robotThatWasHelping)
+            operatorThatWasUsingTheRobot.needHelpingRobot = False
+            self.setRobotToIdle(robotThatWasHelping)
+
+        del operator
+        del self.activeOperatorDictionary[data.data]
+        print("Unregistered " + data.data)
+
+    # Called when # Supervisors changes (register or unregister)
+    def distributeRobotsToSupervisor(self):
+        # go through the robots and assign one at a time
+        supervisorList = list(self.activeSupervisorDictionary.values())
+        if (len(supervisorList) == 0):
+            for i, robot in enumerate(self.activeRobotDictionary.values()):
+                robot.supervisorID = ''
+            return
+        for supervisor in self.activeSupervisorDictionary.values():
+            supervisor.activeRobotDictionary = {}
+            del supervisor.activeTaskList[:]
+        for i, robot in enumerate(self.activeRobotDictionary.values()):
+            supervisor = supervisorList[(i % len(self.activeSupervisorDictionary.values()))]
+            supervisor.activeRobotDictionary[robot.name] = robot
+            robot.supervisorID = supervisor.supervisorID
+            robotTask = self.convertTaskMsgToTask(robot.currentTask)
+            supervisor.activeTaskList.append(robotTask)
+
+    # I think this will work?
+    def convertTaskMsgToTask(self, taskMsg):
+        # calculate basePriority
+        timeElapsed = (time.time() - taskMsg.timeAdded) / 60
+        basePriority = self.taskPrios[taskMsg.taskName]
+
+        task = Task(taskMsg.taskName, basePriority, taskMsg.robotName,
+                    taskMsg.X, taskMsg.Y, taskMsg.yaw, taskMsg.isRaisedPriority, taskMsg.OGSupervisorID,
+                    taskMsg.variables)
+        task.addedToQueue = taskMsg.timeAdded
+        return task
+
+        # TODO: have to distribute the tasks in the priorityQueue to the other superviors and the activeTaskList...
+        #  clear activeTaskList. When we place a robot in a supervisors dictionary (after clearing it), we convert the
+        #  taskmsg to task and add it to activeTaskList for that supervisor. When a new supervisor is created, don't
+        #  shuffle around the PQ. If a supervisor was killed, we take their priority queue, pass it into the function.
+        #  And then for each of the rest of the supervisors, round robin convert to task object and append to
+        #  their respective PQs
+
+    # Called when a supervisor unregisters to give other active supervisors the tasks
+    def distributeDeadPriorityQueue(self, orphanedPQ):
+        # if no supervisors are left dump it into the middleman unsupervised tasks and make all active robots idle
+        if len(self.activeSupervisorDictionary) == 1: # supervisor gets deleted after this function (process task uses supervisor)
+            for task in orphanedPQ:
+                task.OGSupervisorID = ''
+                self.unsupervisedTasks.append(task)
+            for robot in self.activeRobotDictionary.values():
+                self.setRobotToIdle(robot)
+                robot.supervisorID = ''
+        else:
+            supervisorList = list(self.activeSupervisorDictionary.values())
+            for i, task in enumerate(orphanedPQ):
+                supervisor = supervisorList[(i % len(self.activeSupervisorDictionary.values()))]
+                supervisor.taskPriorityQueue.append(task)
+
+    def setRobotToIdle(self, robot):
+        info_str = robot.supervisorID + ' ' + 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+        self.processTask(info_str)
+
+    def findOperatorFromRobot(self, robot):
+        for operator in self.activeOperatorDictionary.values():
+            if (operator.currentRobot == robot):
+                return operator
 
     # every robot pose updates here
     # data is PoseWithCovarianceStamped
@@ -498,7 +662,7 @@ class Middleman():
             except:
                 pass
             robotList.robots.append(robot)
-            #print(type(robot.currentTask.variables))
+            # print(type(robot.currentTask.variables))
 
         self.statePublisherForOperator.publish(robotList)
         self.statePublisherForSupervisor.publish(robotList)
@@ -510,23 +674,26 @@ class Middleman():
         """
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
-            if robot.currentTaskName == "IDLE" and len(self.taskPriorityQueue) > 0:
-                # assign robot a task in th priority queue
-                highestPriorityTask = self.taskPriorityQueue.pop()
-                highestPriorityTask.robotName = robot.name
-                taskMsg = highestPriorityTask.convertTaskToTaskMsg()
+            if robot.currentTaskName == "IDLE":
+                if (self.activeRobotDictionary[robot.name].supervisorID != ""):
+                    supervisor = self.activeSupervisorDictionary[self.activeRobotDictionary[robot.name].supervisorID]
+                    if len(supervisor.taskPriorityQueue) > 0:
+                        # assign robot a task in th priority queue
+                        highestPriorityTask = supervisor.taskPriorityQueue.pop()
+                        highestPriorityTask.robotName = robot.name
+                        taskMsg = highestPriorityTask.convertTaskToTaskMsg()
 
-                #print(self.activeTaskList)
-                for task in self.activeTaskList:
-                    if robot.currentTask.ID == task.getID():
-                        self.activeTaskList.remove(task)
-                        break
-                #print(self.activeTaskList)
+                        # print(self.activeTaskList)
+                        for task in supervisor.activeTaskList:
+                            if robot.currentTask.ID == task.getID():
+                                supervisor.activeTaskList.remove(task)
+                                break
+                        # print(self.activeTaskList)
 
-                robot.currentTask = taskMsg
-                robot.currentTaskName = taskMsg.taskName
-                self.taskFns[highestPriorityTask.taskName](taskMsg)
-                self.activeTaskList.append(highestPriorityTask)
+                        robot.currentTask = taskMsg
+                        robot.currentTaskName = taskMsg.taskName
+                        self.taskFns[highestPriorityTask.taskName](taskMsg)
+                        supervisor.activeTaskList.append(highestPriorityTask)
 
     def publishRobotsLeftInQueue(self):
         """
@@ -538,13 +705,14 @@ class Middleman():
         """
         Publishes the task list (active tasks being completed and unassigned priority sorted tasks)
         """
-        taskMsgList = TaskMsgArr()
-        self.taskPriorityQueue.sort(key=lambda t: t.getPriority())
-        for task in (self.activeTaskList + self.taskPriorityQueue):
-            # turn object into Msg type to publish
-            taskMsg = task.convertTaskToTaskMsg()
-            taskMsgList.taskMsgs.append(taskMsg)
-        self.taskListPublisher.publish(taskMsgList)
+        for supervisor in self.activeSupervisorDictionary.values():
+            taskMsgList = TaskMsgArr()
+            supervisor.taskPriorityQueue.sort(key=lambda t: t.getPriority())
+            for task in (supervisor.activeTaskList + supervisor.taskPriorityQueue):
+                # turn object into Msg type to publish
+                taskMsg = task.convertTaskToTaskMsg()
+                taskMsgList.taskMsgs.append(taskMsg)
+            supervisor.taskListPublisher.publish(taskMsgList)
 
     # When a given amount of time has passed, check for reassignment of robot to highest priority task in the priority
     # queue
@@ -554,12 +722,14 @@ class Middleman():
         queue
         """
         fiveMinutes = 60
-        # if the time has elapsed for a reassinment check, and the length of both queues are greater than zero (meaning we can swap)
-        if((time.time() - self.reassignmentCounter > fiveMinutes) and (len(self.taskPriorityQueue) > 0) and (len(self.activeTaskList) > 0)):
-                highestPriorityTask = self.taskPriorityQueue[-1]
-                self.activeTaskList.sort(key=lambda task: task.getPriority())
-                lowestPriorityTask = self.activeTaskList[0]
-                if(lowestPriorityTask.taskName != "IDLE"):
+        for supervisor in self.activeSupervisorDictionary.values():
+            # if the time has elapsed for a reassinment check, and the length of both queues are greater than zero (meaning we can swap)
+            if ((time.time() - self.reassignmentCounter > fiveMinutes) and (len(supervisor.taskPriorityQueue) > 0) and (
+                    len(supervisor.activeTaskList) > 0)):
+                highestPriorityTask = supervisor.taskPriorityQueue[-1]
+                supervisor.activeTaskList.sort(key=lambda task: task.getPriority())
+                lowestPriorityTask = supervisor.activeTaskList[0]
+                if (lowestPriorityTask.taskName != "IDLE"):
                     if highestPriorityTask.getPriority() > lowestPriorityTask.getPriority():
                         print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(
                             highestPriorityTask.getPriority()))
@@ -567,24 +737,24 @@ class Middleman():
                         # swap the active task with high  [Active, High Priority]
                         swappedTasks.taskMsgs.append(lowestPriorityTask.convertTaskToTaskMsg())
                         swappedTasks.taskMsgs.append(highestPriorityTask.convertTaskToTaskMsg())
-                        self.taskReassignmentPublisher.publish(swappedTasks)
+                        supervisor.taskReassignmentPublisher.publish(swappedTasks)
                         # remove from priority queue
-                        self.taskPriorityQueue.pop()
+                        supervisor.taskPriorityQueue.pop()
                         # reassign robot name
                         highestPriorityTask.robotName = lowestPriorityTask.robotName
                         # add new task to active
-                        self.activeTaskList.append(highestPriorityTask)
+                        supervisor.activeTaskList.append(highestPriorityTask)
                         self.taskFns[highestPriorityTask.taskName](highestPriorityTask)  # call task function
 
                         # remove now inactive from activeList
-                        self.activeTaskList.remove(lowestPriorityTask)
-                        robotBeingReassigned = self.activeRobotDictionary[lowestPriorityTask.robotName]
+                        supervisor.activeTaskList.remove(lowestPriorityTask)
+                        robotBeingReassigned = supervisor.activeRobotDictionary[lowestPriorityTask.robotName]
                         robotBeingReassigned.currentTask = highestPriorityTask.convertTaskToTaskMsg()
                         robotBeingReassigned.currentTaskName = highestPriorityTask.taskName
                         # reassign active task to unassigned status
                         lowestPriorityTask.robotName = 'unassigned'
                         # add previously active task to priority queue
-                        self.taskPriorityQueue.append(lowestPriorityTask)
+                        supervisor.taskPriorityQueue.append(lowestPriorityTask)
 
                 self.reassignmentCounter = time.time()
 
@@ -592,21 +762,20 @@ class Middleman():
         posTolerance = .1
         orientationTolerance = .3
         for robot in self.activeRobotDictionary.values():
-            if(robot.currentTask.taskName == "NAV"):
+            if (robot.currentTask.taskName == "NAV"):
                 quat = robot.pose.pose.pose.orientation
                 quat_list = [quat.x, quat.y, quat.z, quat.w]
                 robotEuler = euler_from_quaternion(quat_list)
                 robYaw = robotEuler[2]
-                print(abs(robYaw - robot.currentTask.yaw))
 
-                if((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
+                if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
                         (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and
                         (abs(robYaw - robot.currentTask.yaw) <= orientationTolerance)):
-                        # if we do via points, instead of IDLE task, send next position in via points list
-                        info_str = 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
-                        self.processTask(info_str)
+                    # if we do via points, instead of IDLE task, send next position in via points list
+                    self.setRobotToIdle(robot)
 
             pass
+
 
 middleman = Middleman()
 while not rospy.is_shutdown():
