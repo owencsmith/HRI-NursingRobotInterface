@@ -14,27 +14,28 @@ https://github.com/owencsmith/HRI-NursingRobotInterface
 
 **Step 3:**
 Install the required Python 3.6 dependences: PyQt5, PyQt5-sip, PyQt5-stubs
-**Step 3:**
-Use ‘catkin_make’ to build the catkin-workspace
 
 **Step 4:**
-Run `roscore`
+Use ‘catkin_make’ to build the catkin-workspace
 
 **Step 5:**
+Run `roscore`
+
+**Step 6:**
 Run the middleman node
 `/catkin_ws/src/HRI-NursingRobotInterface$ rosrun middleman Middleman.py`
 
-**Step 6:**
+**Step 7:**
 Run the trina2 simulation node
 `../..$ roslaunch trina2_gazebo trina2.launch`
 This launch file can be edited to include more robots in the simulation.
 
-**Step 7:**
+**Step 8:**
 Run the supervisor UI(s)
 `/catkin_ws/src/HRI-NursingRobotInterface/supervisorUI/src$ python3 SupervisorUI.py`
 This can be called any number of times to achieve the number of desired supervisors.
 
-**Step 8:**
+**Step 9:**
 Run the operator UI(s)
 `/catkin_ws/src/HRI-NursingRobotInterface/operatorUI/src$ python3 OperatorUI.py`
 This can be called any number of times to achieve the number of desired operators.
