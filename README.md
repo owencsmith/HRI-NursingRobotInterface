@@ -13,6 +13,8 @@ Clone the project repository for this project:
 https://github.com/owencsmith/HRI-NursingRobotInterface
 
 **Step 3:**
+Install the required Python 3.6 dependences: PyQt5, PyQt5-sip, PyQt5-stubs
+**Step 3:**
 Use ‘catkin_make’ to build the catkin-workspace
 
 **Step 4:**
