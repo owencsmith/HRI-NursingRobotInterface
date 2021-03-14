@@ -123,6 +123,11 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.drawingModality = 0
         self.FreeHandSketchButton.setEnabled(False)
 
+        self.sketchButtonList = [self.RectangleSketchButton, self.FreeHandSketchButton, self.LineSketchButton,
+                                 self.LowRiskSketchButton, self.MediumRiskSketchButton, self.HighRiskSketchButton]
+        for buttons in self.sketchButtonList:
+            buttons.setVisible(False)
+
         self.SideMenuShowing = False
         self.SetUpTable()
         # New supervisor message for middleman
@@ -341,9 +346,16 @@ class SupervisorUI(QtWidgets.QMainWindow):
         # Toggle Sketch mode on/off
         self.sketchMode = not self.sketchMode
 
-        # switch text of button
-        button_text = 'Save Zones' if self.sketchMode else 'Edit Zones'
-        self.SketchToggleButton.setText(button_text)
+        if self.sketchMode:
+            button_text = 'Save Zones'
+            self.SketchToggleButton.setText(button_text)
+            for sketch_buttons in self.sketchButtonList:
+                sketch_buttons.setVisible(True)
+        else:
+            button_text = 'Edit Zones'
+            self.SketchToggleButton.setText(button_text)
+            for sketch_buttons in self.sketchButtonList:
+                sketch_buttons.setVisible(False)
 
     def taskListClickedCallback(self, row, col):
         if col !=3:
@@ -730,8 +742,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.LineSketchButton.resize(squareButtonWidth, squareButtonHeight)
         self.FreeHandSketchButton.resize(squareButtonWidth, squareButtonHeight)
         self.RectangleSketchButton.resize(squareButtonWidth, squareButtonHeight)
-        self.LineSketchButton.move(self.windowWidth*0.42-squareButtonWidth, squareButtonY)
-        self.FreeHandSketchButton.move(self.windowWidth*0.45-squareButtonWidth, squareButtonY)
+        self.FreeHandSketchButton.move(self.windowWidth*0.42-squareButtonWidth, squareButtonY)
+        self.LineSketchButton.move(self.windowWidth*0.45-squareButtonWidth, squareButtonY)
         self.RectangleSketchButton.move(self.windowWidth*0.48-squareButtonWidth, squareButtonY)
 
         self.SideMenu.move(self.windowWidth, 0)
