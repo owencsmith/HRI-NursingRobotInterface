@@ -123,6 +123,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SupervisorMap.wheelEvent = self.wheelEvent
         self.SupervisorMap.setScene(self.scene)
         self.loadMap(map)
+        self.scene.setSceneRect(self.SupervisorMap.sceneRect())
 
         # for keeping track of sketching positions
         self.last_x = None
@@ -152,6 +153,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.heartBeatPublisher = rospy.Publisher('/' + id + '/heartbeat', String, queue_size=10)
         rospy.sleep(1)
         self.newSupervisorIDPublisher.publish(id)
+
+
 
     def sendHeartBeat(self, data):
         self.heartBeatPublisher.publish("lubdub")
@@ -513,6 +516,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     self.sketchItems.append(itemToDraw)
                     self.scene.addItem(itemToDraw)
 
+
             elif self.right_click:
                 # erase at mouse intersection
                 # check if mouse is over bounding box of any group in sketchItems
@@ -530,6 +534,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.sketchItems.append(self.graphics_group)
             elif event.button() == QtCore.Qt.RightButton:
                 self.right_click = False
+
 
     def makeTarget(self, X, Y, obSize, color):
         shapes = []
