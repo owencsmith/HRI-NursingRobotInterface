@@ -3,7 +3,7 @@ import rospy
 import rospkg
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
-    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton
+    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton,  QGraphicsItemGroup
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel, QIcon, \
     QImage, QPixmap
@@ -24,14 +24,16 @@ map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital.json"
 trashIcon = rospack.get_path('supervisorUI') + "/src/trashCanIcon.jpg"
 cameraIcon = rospack.get_path('supervisorUI') + "/src/camera-icon.png"
 
+
 class SupervisorUI(QtWidgets.QMainWindow):
     robotUpdateSignal = pyqtSignal('PyQt_PyObject')
     taskUpdateSignal = pyqtSignal('PyQt_PyObject')
     robotTaskChangeSignal = pyqtSignal('PyQt_PyObject')
     CamUpdateSignal = pyqtSignal('PyQt_PyObject')
+
     def __init__(self, width, height, id):
         super(SupervisorUI, self).__init__()
-        self.ui = uic.loadUi(designerFile, self)#loads the ui file and adds member names to class
+        self.ui = uic.loadUi(designerFile, self) # loads the ui file and adds member names to class
         self.slideInMenuWidth = 0 # these all get set by fitToScreen method
         self.windowHeight = 0
         self.id = id
@@ -49,6 +51,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.RoomNameList = []
         self.RobotTasksToCode = {}
         self.taskListRefresh = 0
+        self.sketchMode = False
         self.poseYaw = 90
         self.poseShapes = []
         self.PoseSlider.setMinimum(0)
@@ -72,7 +75,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.pickLocation = False
         self.LocationPicked = False
         self.clickedX = 0
-        self.clickedY= 0
+        self.clickedY = 0
         self.LocationCoordinates = (0, 0)
         self.CreateTaskButton.clicked.connect(self.ToggleSideMenu)
         self.SelectLocationBTN.clicked.connect(self.SelectLocationCallback)
@@ -83,6 +86,12 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.ToggleObstaclesCB.stateChanged.connect(self.obstacleComboBoxChanged)
         self.CloseCameraBTN.clicked.connect(self.closeCam)
         self.RobotListTable.cellClicked.connect(self.openCam)
+        self.SketchToggleButton.clicked.connect(self.sketchModeToggleClickedCallback)
+        self.RectangleSketchButton.clicked.connect(self.rectangleSketchButtonCallback)
+        self.FreeHandSketchButton.clicked.connect(self.freeHandSketchButtonCallback)
+        self.LineSketchButton.clicked.connect(self.lineSketchButtonCallback)
+
+        # colors for ease of use
         self.black = QColor(qRgb(0, 0, 0))
         self.blue = QColor(qRgb(30, 144, 255))
         self.red = QColor(qRgb(220, 20, 60))
@@ -93,24 +102,37 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.magenta = QColor(qRgb(255, 0, 255))
         self.white = QColor(qRgb(255, 255, 255))
         self.gray = QColor(qRgb(119, 136, 153))
+
         self.scaleFactor = 0.4*self.mapWidth/1500 #the map was designed for a 1500 pixel square map.This adjusts for the screen size
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.SupervisorMap.setMouseTracking(True)
+        self.scene.mouseMoveEvent = self.mapMouseMoveEventHandler
+        self.scene.mouseReleaseEvent = self.mapMouseReleaseEventHandler
         self.SupervisorMap.wheelEvent = self.wheelEvent
         self.SupervisorMap.setScene(self.scene)
         self.loadMap(map)
+
+        # for keeping track of sketching positions
+        self.last_x = None
+        self.last_y = None
+        self.left_click = False
+        self.right_click = False
+        self.graphics_group = self.scene.createItemGroup([])
+        self.sketchItems = []
+        self.drawingModality = 0
+        self.FreeHandSketchButton.setEnabled(False)
+
         self.SideMenuShowing = False
         self.SetUpTable()
-        #New supervisor message for middleman
+        # New supervisor message for middleman
         self.newSupervisorIDPublisher = rospy.Publisher('/supervisor/new_supervisor_ui', String, queue_size = 10)
 
-        #heartbeat stuff
+        # heartbeat stuff
         rospy.Timer(rospy.Duration(.5), self.sendHeartBeat)
         self.heartBeatPublisher = rospy.Publisher('/' + id + '/heartbeat', String, queue_size = 10)
         rospy.sleep(1)
         self.newSupervisorIDPublisher.publish(id)
-
 
     def sendHeartBeat(self, data):
         self.heartBeatPublisher.publish("lubdub")
@@ -147,7 +169,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             if (result + 1 == 20):
                 self.SideMenuShowing = True
 
-    def keyPressEvent(self, event):#this is overriding qMainWindow
+    def keyPressEvent(self, event):  # this is overriding qMainWindow
         if event.key() == Qt.Key_M:
             pass
 
@@ -162,7 +184,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.PriorityQueueTable.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-
 
     def loadMap(self, mapLocation):
         with open(mapLocation) as file:
@@ -293,7 +314,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.scene.addItem(label)
                 self.RobotShapes.append(label)
 
-
     def taskListRosCallback(self, message):
         self.taskUpdateSignal.emit(message)
 
@@ -317,6 +337,13 @@ class SupervisorUI(QtWidgets.QMainWindow):
                         self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 2).setBackground(QColor(245, 167, 66))
                         self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 3).setBackground(QColor(245, 167, 66))
 
+    def sketchModeToggleClickedCallback(self):
+        # Toggle Sketch mode on/off
+        self.sketchMode = not self.sketchMode
+
+        # switch text of button
+        button_text = 'Save Zones' if self.sketchMode else 'Edit Zones'
+        self.SketchToggleButton.setText(button_text)
 
     def taskListClickedCallback(self, row, col):
         if col !=3:
@@ -389,6 +416,77 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.LocationPicked = True
             self.drawPoseArrow()
             self.SelectLocationBTN.setEnabled(True)
+        elif self.sketchMode:
+            # self.last_x = event.scenePos().x()
+            # self.last_y = event.scenePos().y()
+            if event.button() == QtCore.Qt.LeftButton:
+                self.left_click = True
+                self.graphics_group = self.scene.createItemGroup([])
+            elif event.button() == QtCore.Qt.RightButton:
+                self.right_click = True
+
+    def mapMouseMoveEventHandler(self, event):
+        if self.sketchMode:
+            if self.left_click:
+                pen = QPen(self.black)
+                pen.setWidth(8)
+
+                # Freehand drawing
+                if self.drawingModality == 0:
+                    if self.last_x is None:  # First event.
+                        self.last_x = event.scenePos().x()
+                        self.last_y = event.scenePos().y()
+                        return  # Ignore the first time.
+
+                    itemToDraw = QGraphicsLineItem(self.last_x, self.last_y, event.scenePos().x(), event.scenePos().y())
+                    itemToDraw.setPen(pen)
+                    self.graphics_group.addToGroup(itemToDraw)
+
+                    # Update the origin for next time.
+                    self.last_x = event.scenePos().x()
+                    self.last_y = event.scenePos().y()
+                # Line drawing
+                elif self.drawingModality == 1:
+                    if self.last_x is None:
+                        self.last_x = event.scenePos().x()
+                        self.last_y = event.scenePos().y()
+                    else:
+                        self.scene.removeItem(self.sketchItems.pop())
+
+                    itemToDraw = QGraphicsLineItem(self.last_x, self.last_y, event.scenePos().x(), event.scenePos().y())
+                    itemToDraw.setPen(pen)
+                    self.sketchItems.append(itemToDraw)
+                    self.scene.addItem(itemToDraw)
+                # Rectangle drawing
+                elif self.drawingModality == 2:
+                    if self.last_x is None:
+                        self.last_x = event.scenePos().x()
+                        self.last_y = event.scenePos().y()
+                    else:
+                        self.scene.removeItem(self.sketchItems.pop())
+
+                    itemToDraw = QGraphicsRectItem(self.last_x, self.last_y, event.scenePos().x()-self.last_x, event.scenePos().y()-self.last_y)
+                    itemToDraw.setPen(pen)
+                    self.sketchItems.append(itemToDraw)
+                    self.scene.addItem(itemToDraw)
+
+            elif self.right_click:
+                # erase at mouse intersection
+                # check if mouse is over bounding box of any group in sketchItems
+                for groups in self.sketchItems:
+                    if groups.isUnderMouse():
+                        # if it does then remove it from the scene
+                        self.scene.removeItem(groups)
+
+    def mapMouseReleaseEventHandler(self, event):
+        if self.sketchMode:
+            self.last_x = None
+            self.last_y = None
+            if event.button() == QtCore.Qt.LeftButton:
+                self.left_click = False
+                self.sketchItems.append(self.graphics_group)
+            elif event.button() == QtCore.Qt.RightButton:
+                self.right_click = False
 
     def makeTarget(self, X, Y, obSize, color):
         shapes = []
@@ -501,6 +599,24 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.TaskSwitchList.clear()
         self.TaskSwitchFrame.hide()
 
+    def rectangleSketchButtonCallback(self):
+        self.drawingModality = 2
+        self.RectangleSketchButton.setEnabled(False)
+        self.FreeHandSketchButton.setEnabled(True)
+        self.LineSketchButton.setEnabled(True)
+
+    def freeHandSketchButtonCallback(self):
+        self.drawingModality = 0
+        self.RectangleSketchButton.setEnabled(True)
+        self.FreeHandSketchButton.setEnabled(False)
+        self.LineSketchButton.setEnabled(True)
+
+    def lineSketchButtonCallback(self):
+        self.drawingModality = 1
+        self.RectangleSketchButton.setEnabled(True)
+        self.FreeHandSketchButton.setEnabled(True)
+        self.LineSketchButton.setEnabled(False)
+
     def taskComboBoxChanged(self):
         #print("Combo changed")
         self.ErrorLBL.hide()
@@ -581,7 +697,14 @@ class SupervisorUI(QtWidgets.QMainWindow):
         robotListWidth = self.windowWidth*0.2
         self.mapWidth = self.windowWidth*0.8
         createTaskButtonWidth = self.windowWidth*0.12
-        createTaskButtonHeight = self.windowHeight*0.02
+        zoneButtonWidth = self.windowWidth*0.07
+        thinButtonHeight = self.windowHeight*0.02
+
+        squareButtonWidth = self.windowWidth*0.025
+        squareButtonHeight = squareButtonWidth
+        thinButtonY = self.windowHeight*0.98-thinButtonHeight
+        squareButtonY = self.windowHeight*0.98-squareButtonHeight
+
         self.RobotListTable.resize(robotListWidth, self.windowHeight*0.7)
         self.priorityQueueLBL.move(0,self.windowHeight*0.7)
         self.priorityQueueLBL.resize(robotListWidth, self.windowHeight * 0.02)
@@ -590,9 +713,27 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SupervisorMap.resize(self.mapWidth, self.windowHeight)
         self.SupervisorMap.move(robotListWidth, 0)
         self.ToggleObstaclesCB.move(robotListWidth+self.windowWidth*0.01, self.windowHeight*0.96)
-        self.ToggleObstaclesCB.resize(createTaskButtonWidth, createTaskButtonHeight)
-        self.CreateTaskButton.resize(createTaskButtonWidth, createTaskButtonHeight)
-        self.CreateTaskButton.move(self.windowWidth*0.96-createTaskButtonWidth, self.windowHeight*0.98-createTaskButtonHeight)
+        self.ToggleObstaclesCB.resize(createTaskButtonWidth, thinButtonHeight)
+
+        self.CreateTaskButton.resize(createTaskButtonWidth, thinButtonHeight)
+        self.SketchToggleButton.resize(zoneButtonWidth, thinButtonHeight)
+        self.CreateTaskButton.move(self.windowWidth*0.96-createTaskButtonWidth, thinButtonY)
+        self.SketchToggleButton.move(self.windowWidth*0.78-zoneButtonWidth, thinButtonY)
+
+        self.HighRiskSketchButton.resize(squareButtonWidth, squareButtonHeight)
+        self.MediumRiskSketchButton.resize(squareButtonWidth, squareButtonHeight)
+        self.LowRiskSketchButton.resize(squareButtonWidth, squareButtonHeight)
+        self.HighRiskSketchButton.move(self.windowWidth*0.62-squareButtonWidth, squareButtonY)
+        self.MediumRiskSketchButton.move(self.windowWidth*0.65-squareButtonWidth, squareButtonY)
+        self.LowRiskSketchButton.move(self.windowWidth*0.68-squareButtonWidth, squareButtonY)
+
+        self.LineSketchButton.resize(squareButtonWidth, squareButtonHeight)
+        self.FreeHandSketchButton.resize(squareButtonWidth, squareButtonHeight)
+        self.RectangleSketchButton.resize(squareButtonWidth, squareButtonHeight)
+        self.LineSketchButton.move(self.windowWidth*0.42-squareButtonWidth, squareButtonY)
+        self.FreeHandSketchButton.move(self.windowWidth*0.45-squareButtonWidth, squareButtonY)
+        self.RectangleSketchButton.move(self.windowWidth*0.48-squareButtonWidth, squareButtonY)
+
         self.SideMenu.move(self.windowWidth, 0)
         self.SideMenu.resize(self.slideInMenuWidth, self.windowHeight)
         self.CameraFrame.move(robotListWidth, 0)
