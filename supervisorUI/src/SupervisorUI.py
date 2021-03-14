@@ -3,10 +3,10 @@ import rospy
 import rospkg
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
-    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton,  QGraphicsItemGroup
+    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton, QGraphicsItemGroup
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel, QIcon, \
-    QImage, QPixmap
+    QImage, QPixmap, QRgba64
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint, QPointF
 from PyQt5.QtCore import Qt, QLineF, QRectF
 import sys
@@ -18,9 +18,10 @@ from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from middleman.srv import TaskString, TaskStringResponse
 from sensor_msgs.msg import Image
+
 rospack = rospkg.RosPack()
-designerFile = rospack.get_path('supervisorUI')+"/src/SupervisorUI.ui"
-map = rospack.get_path('supervisorUI')+"/src/Maps/Hospital.json"
+designerFile = rospack.get_path('supervisorUI') + "/src/SupervisorUI.ui"
+map = rospack.get_path('supervisorUI') + "/src/Maps/Hospital.json"
 trashIcon = rospack.get_path('supervisorUI') + "/src/trashCanIcon.jpg"
 cameraIcon = rospack.get_path('supervisorUI') + "/src/camera-icon.png"
 
@@ -33,8 +34,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
     def __init__(self, width, height, id):
         super(SupervisorUI, self).__init__()
-        self.ui = uic.loadUi(designerFile, self) # loads the ui file and adds member names to class
-        self.slideInMenuWidth = 0 # these all get set by fitToScreen method
+        self.ui = uic.loadUi(designerFile, self)  # loads the ui file and adds member names to class
+        self.slideInMenuWidth = 0  # these all get set by fitToScreen method
         self.windowHeight = 0
         self.id = id
         self.windowWidth = 0
@@ -64,11 +65,13 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.CamUpdateSignal.connect(self.CamUpdate)
         self.stateSubscriber = rospy.Subscriber('/supervisor/robotState', RobotArr, self.robotStateCallback)
         self.taskSubscriber = rospy.Subscriber('/' + id + '/taskList', TaskMsgArr, self.taskListRosCallback)
-        self.taskChangeSubscriber = rospy.Subscriber('/' + id + '/taskReassignment', TaskMsgArr, self.taskChangeCallback)
+        self.taskChangeSubscriber = rospy.Subscriber('/' + id + '/taskReassignment', TaskMsgArr,
+                                                     self.taskChangeCallback)
         self.taskPublisher = rospy.Publisher("/supervisor/task", String, queue_size=10)
         self.deleteTaskPublisher = rospy.Publisher("/supervisor/removeTask", String, queue_size=10)
         self.CamSubscriber = rospy.Subscriber('none', Image, self.CamRosCallback)
         rospy.wait_for_service('/supervisor/taskCodes')
+
         self.fillRobotTasks()
         self.SideMenuThread = SideMenuThread()
         self.SideMenuThread.signal.connect(self.SideMenuThreadCallback)
@@ -77,6 +80,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.clickedX = 0
         self.clickedY = 0
         self.LocationCoordinates = (0, 0)
+
+        # connect buttons and other Qt modules to action events
         self.CreateTaskButton.clicked.connect(self.ToggleSideMenu)
         self.SelectLocationBTN.clicked.connect(self.SelectLocationCallback)
         self.ConfirmTask.clicked.connect(self.confirmTaskCreationCallback)
@@ -90,20 +95,26 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.RectangleSketchButton.clicked.connect(self.rectangleSketchButtonCallback)
         self.FreeHandSketchButton.clicked.connect(self.freeHandSketchButtonCallback)
         self.LineSketchButton.clicked.connect(self.lineSketchButtonCallback)
+        self.HighRiskSketchButton.clicked.connect(self.highRiskSketchButtonCallback)
+        self.MediumRiskSketchButton.clicked.connect(self.mediumRiskSketchButtonCallback)
+        self.LowRiskSketchButton.clicked.connect(self.lowRiskSketchButtonCallback)
 
         # colors for ease of use
         self.black = QColor(qRgb(0, 0, 0))
         self.blue = QColor(qRgb(30, 144, 255))
         self.red = QColor(qRgb(220, 20, 60))
-        self.green = QColor(qRgb(0, 255, 127))
-        self.Orange = QColor(qRgb(255, 165, 0))
+        self.redFill = QColor(QRgba64.fromRgba(220, 20, 60, 75))
+        self.green = QColor(qRgb(65, 215, 125))
+        self.greenFill = QColor(QRgba64.fromRgba(65, 215, 125, 75))
+        self.orange = QColor(qRgb(255, 165, 0))
+        self.orangeFill = QColor(QRgba64.fromRgba(255, 165, 0, 75))
         self.yellow = QColor(qRgb(255, 255, 0))
         self.purple = QColor(qRgb(238, 130, 238))
         self.magenta = QColor(qRgb(255, 0, 255))
         self.white = QColor(qRgb(255, 255, 255))
         self.gray = QColor(qRgb(119, 136, 153))
 
-        self.scaleFactor = 0.4*self.mapWidth/1500 #the map was designed for a 1500 pixel square map.This adjusts for the screen size
+        self.scaleFactor = 0.4 * self.mapWidth / 1500  # the map was designed for a 1500 pixel square map.This adjusts for the screen size
         self.scene = QGraphicsScene()
         self.scene.mousePressEvent = self.mapClickEventHandler  # allows for the grid to be clicked
         self.SupervisorMap.setMouseTracking(True)
@@ -121,7 +132,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.graphics_group = self.scene.createItemGroup([])
         self.sketchItems = []
         self.drawingModality = 0
+        self.sketchPen = QPen(self.red)
+        self.sketchBrush = QBrush(self.redFill)
         self.FreeHandSketchButton.setEnabled(False)
+        self.HighRiskSketchButton.setEnabled(False)
 
         self.sketchButtonList = [self.RectangleSketchButton, self.FreeHandSketchButton, self.LineSketchButton,
                                  self.LowRiskSketchButton, self.MediumRiskSketchButton, self.HighRiskSketchButton]
@@ -131,11 +145,11 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SideMenuShowing = False
         self.SetUpTable()
         # New supervisor message for middleman
-        self.newSupervisorIDPublisher = rospy.Publisher('/supervisor/new_supervisor_ui', String, queue_size = 10)
+        self.newSupervisorIDPublisher = rospy.Publisher('/supervisor/new_supervisor_ui', String, queue_size=10)
 
         # heartbeat stuff
         rospy.Timer(rospy.Duration(.5), self.sendHeartBeat)
-        self.heartBeatPublisher = rospy.Publisher('/' + id + '/heartbeat', String, queue_size = 10)
+        self.heartBeatPublisher = rospy.Publisher('/' + id + '/heartbeat', String, queue_size=10)
         rospy.sleep(1)
         self.newSupervisorIDPublisher.publish(id)
 
@@ -161,16 +175,20 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SideMenuThread.start()
 
     def SideMenuThreadCallback(self, result):
-        if(self.SideMenuShowing):
+        if (self.SideMenuShowing):
             self.CreateTaskButton.setText("Create Task")
-            self.SupervisorMap.resize((self.mapWidth-self.slideInMenuWidth)+(result+1)*self.slideInMenuWidth/self.numAnimationSteps, self.windowHeight)
-            self.SideMenu.move(self.windowWidth-self.slideInMenuWidth+(result+1)*self.slideInMenuWidth/self.numAnimationSteps, 0)
-            if(result+1==20):
+            self.SupervisorMap.resize(
+                (self.mapWidth - self.slideInMenuWidth) + (result + 1) * self.slideInMenuWidth / self.numAnimationSteps,
+                self.windowHeight)
+            self.SideMenu.move(self.windowWidth - self.slideInMenuWidth + (
+                        result + 1) * self.slideInMenuWidth / self.numAnimationSteps, 0)
+            if (result + 1 == 20):
                 self.SideMenuShowing = False
         else:
             self.CreateTaskButton.setText("Close")
-            self.SupervisorMap.resize(self.mapWidth - (result + 1) * self.slideInMenuWidth/self.numAnimationSteps, self.windowHeight)
-            self.SideMenu.move(self.windowWidth - (result + 1) * self.slideInMenuWidth/self.numAnimationSteps, 0)
+            self.SupervisorMap.resize(self.mapWidth - (result + 1) * self.slideInMenuWidth / self.numAnimationSteps,
+                                      self.windowHeight)
+            self.SideMenu.move(self.windowWidth - (result + 1) * self.slideInMenuWidth / self.numAnimationSteps, 0)
             if (result + 1 == 20):
                 self.SideMenuShowing = True
 
@@ -194,14 +212,15 @@ class SupervisorUI(QtWidgets.QMainWindow):
         with open(mapLocation) as file:
             mapObjList = json.load(file)
         for item in mapObjList["objects"]:
-            if(item["type"]=="rect"):
-                shape = QGraphicsRectItem(item["centerX"]-item["length"]/2, -item["centerY"]-item["width"]/2, item["length"], item["width"])
+            if (item["type"] == "rect"):
+                shape = QGraphicsRectItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
+                                          item["length"], item["width"])
                 shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
                 shape.setPen(QPen(self.black))
                 shape.setBrush(QBrush(self.black, Qt.SolidPattern))
                 shape.setRotation(item["rotation"])
                 self.scene.addItem(shape)
-            elif (item["type"]=="text"):
+            elif (item["type"] == "text"):
                 label = QGraphicsTextItem(item["text"])
                 label.setX(item["centerX"] - item["length"] / 2)
                 label.setY(-item["centerY"] - item["width"] / 2)
@@ -212,7 +231,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 label.setRotation(item["rotation"])
                 self.RoomNameList.append(label)
                 self.scene.addItem(label)
-            elif (item["type"]=="obstacle"):
+            elif (item["type"] == "obstacle"):
                 shape = QGraphicsRectItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
                                           item["length"], item["width"])
                 shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
@@ -220,9 +239,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 shape.setBrush(QBrush(self.gray, Qt.SolidPattern))
                 shape.setRotation(item["rotation"])
                 self.ObstacleList.append(shape)
-            elif (item["type"]=="plant"):
+            elif (item["type"] == "plant"):
                 shape = QGraphicsEllipseItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
-                                          item["length"], item["width"])
+                                             item["length"], item["width"])
                 shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
                 shape.setPen(QPen(self.green))
                 shape.setBrush(QBrush(self.green, Qt.SolidPattern))
@@ -234,23 +253,23 @@ class SupervisorUI(QtWidgets.QMainWindow):
         pointBeforeScale = self.SupervisorMap.mapToScene(event.pos())
         oldScale = self.scaleFactor
         self.SupervisorMap.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
-        if event.angleDelta().y()>0:
-            if(self.scaleFactor < 2.0):
-                self.scaleFactor += 0.01*self.mapWidth/1500
-        elif event.angleDelta().y()<0:
-            if (self.scaleFactor > 0.4*self.mapWidth/1500):
-                self.scaleFactor -= 0.01*self.mapWidth/1500
-        self.SupervisorMap.scale(self.scaleFactor/oldScale, self.scaleFactor/oldScale)
+        if event.angleDelta().y() > 0:
+            if (self.scaleFactor < 2.0):
+                self.scaleFactor += 0.01 * self.mapWidth / 1500
+        elif event.angleDelta().y() < 0:
+            if (self.scaleFactor > 0.4 * self.mapWidth / 1500):
+                self.scaleFactor -= 0.01 * self.mapWidth / 1500
+        self.SupervisorMap.scale(self.scaleFactor / oldScale, self.scaleFactor / oldScale)
         pointAfterScale = self.SupervisorMap.mapToScene(event.pos())
-        offset = pointAfterScale-pointBeforeScale
+        offset = pointAfterScale - pointBeforeScale
         center = self.SupervisorMap.mapToScene(self.SupervisorMap.viewport().rect().center())
-        self.SupervisorMap.centerOn(center-offset)
+        self.SupervisorMap.centerOn(center - offset)
 
     def robotStateCallback(self, message):
         self.robotUpdateSignal.emit(message)
 
     def drawRobotCallback(self, result):
-        self.RobotListTable.setRowCount(0)#clear table
+        self.RobotListTable.setRowCount(0)  # clear table
         for item in self.RobotShapes:
             self.scene.removeItem(item)
         self.RobotShapes.clear()
@@ -258,7 +277,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.SupervisorSpecificRobotNames.clear()
         for item in result.robots:
             obSize = 70
-            shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x*100 - obSize / 2), -int(item.pose.pose.pose.position.y*100 + obSize / 2), obSize, obSize)
+            shape = QGraphicsEllipseItem(int(item.pose.pose.pose.position.x * 100 - obSize / 2),
+                                         -int(item.pose.pose.pose.position.y * 100 + obSize / 2), obSize, obSize)
             shape.setPen(QPen(self.black))
             # separate the robots by "all" and "supervisor specific"
             if (item.supervisorID == self.id):
@@ -280,8 +300,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.RobotShapes.append(shape)
             self.AllRobotNames.append(item.name)
             label = QGraphicsTextItem(item.name)
-            label.setX(int(item.pose.pose.pose.position.x*100))
-            label.setY(-int(item.pose.pose.pose.position.y*100+obSize*1.2))
+            label.setX(int(item.pose.pose.pose.position.x * 100))
+            label.setY(-int(item.pose.pose.pose.position.y * 100 + obSize * 1.2))
             font = QFont("Bavaria")
             font.setPointSize(18)
             font.setWeight(QFont.Bold)
@@ -293,8 +313,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
             siny_cosp = 2 * (quat.w * quat.z + quat.x * quat.y)
             cosy_cosp = 1 - 2 * (quat.y * quat.y + quat.z * quat.z)
             yaw = math.atan2(siny_cosp, cosy_cosp)
-            #making the arrow
-            arrowLines = self.makeArrow(item.pose.pose.pose.position.x*100, item.pose.pose.pose.position.y*100, yaw, obSize)
+            # making the arrow
+            arrowLines = self.makeArrow(item.pose.pose.pose.position.x * 100, item.pose.pose.pose.position.y * 100, yaw,
+                                        obSize)
             for line in arrowLines:
                 self.scene.addItem(line)
                 self.RobotShapes.append(line)
@@ -323,24 +344,31 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.taskUpdateSignal.emit(message)
 
     def taskListCallback(self, result):
-        self.taskListRefresh +=1
-        if self.taskListRefresh ==4:#this slowsdown the refresh rate so the buttons work more easily
+        self.taskListRefresh += 1
+        if self.taskListRefresh == 4:  # this slowsdown the refresh rate so the buttons work more easily
             self.taskListRefresh = 0
             self.PriorityQueueTable.setRowCount(0)  # clear table
             for item in result.taskMsgs:
                 if item.robotName == "unassigned":
                     self.PriorityQueueTable.insertRow(self.PriorityQueueTable.rowCount())
-                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 0, QTableWidgetItem(item.taskName))
-                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 1, QTableWidgetItem(item.ID))
-                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 2, QTableWidgetItem("{:.2f}".format(item.taskPriority)))
+                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 0,
+                                                    QTableWidgetItem(item.taskName))
+                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 1,
+                                                    QTableWidgetItem(item.ID))
+                    self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 2,
+                                                    QTableWidgetItem("{:.2f}".format(item.taskPriority)))
                     icon_item = QTableWidgetItem()
                     icon_item.setIcon(QIcon(trashIcon))
                     self.PriorityQueueTable.setItem(self.PriorityQueueTable.rowCount() - 1, 3, icon_item)
                     if item.OGSupervisorID != self.id:
-                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 0).setBackground(QColor(245, 167, 66))
-                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 1).setBackground(QColor(245, 167, 66))
-                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 2).setBackground(QColor(245, 167, 66))
-                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 3).setBackground(QColor(245, 167, 66))
+                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 0).setBackground(
+                            QColor(245, 167, 66))
+                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 1).setBackground(
+                            QColor(245, 167, 66))
+                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 2).setBackground(
+                            QColor(245, 167, 66))
+                        self.PriorityQueueTable.item(self.PriorityQueueTable.rowCount() - 1, 3).setBackground(
+                            QColor(245, 167, 66))
 
     def sketchModeToggleClickedCallback(self):
         # Toggle Sketch mode on/off
@@ -358,7 +386,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 sketch_buttons.setVisible(False)
 
     def taskListClickedCallback(self, row, col):
-        if col !=3:
+        if col != 3:
             self.drawGoalPointTaskList(row)
         else:
             self.deleteTask(row)
@@ -374,8 +402,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         if self.RobotTasks[type][1] == "True":
             id = self.PriorityQueueTable.item(row, 1).text()
             parts = id.split("_")
-            X = float(parts[1])*100
-            Y = float(parts[2])*-100
+            X = float(parts[1]) * 100
+            Y = float(parts[2]) * -100
             shapes = self.makeTarget(X, Y, 50, self.blue)
             for shape in shapes:
                 self.GoalTarget.append(shape)
@@ -397,7 +425,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.RobotTasksToCode[taskInfo[1]] = taskInfo[0]
 
     def populateTaskComboBox(self):
-        #will eventually use service request for tasks
+        # will eventually use service request for tasks
         self.SelectTaskCB.clear()
         for key in self.RobotTasks.keys():
             self.SelectTaskCB.addItem(self.RobotTasks[key][0])
@@ -414,9 +442,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     self.scene.removeItem(item)
             self.clickedX = event.scenePos().x()
             self.clickedY = event.scenePos().y()
-            self.LocationCoordinates = (round(self.clickedX/100, 3), round(-self.clickedY/100, 3))
-            self.XLocLabel.setText("X: "+"{:.2f}".format(self.clickedX/100))
-            self.YLocLabel.setText("Y: " + "{:.2f}".format(-self.clickedY/100))
+            self.LocationCoordinates = (round(self.clickedX / 100, 3), round(-self.clickedY / 100, 3))
+            self.XLocLabel.setText("X: " + "{:.2f}".format(self.clickedX / 100))
+            self.YLocLabel.setText("Y: " + "{:.2f}".format(-self.clickedY / 100))
             ##########################Draws Target on screen with 3 circles
             obSize = 50
             shapes = self.makeTarget(self.clickedX, self.clickedY, obSize, self.red)
@@ -440,8 +468,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
     def mapMouseMoveEventHandler(self, event):
         if self.sketchMode:
             if self.left_click:
-                pen = QPen(self.black)
+                pen = self.sketchPen
                 pen.setWidth(8)
+                brush = self.sketchBrush
 
                 # Freehand drawing
                 if self.drawingModality == 0:
@@ -477,8 +506,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     else:
                         self.scene.removeItem(self.sketchItems.pop())
 
-                    itemToDraw = QGraphicsRectItem(self.last_x, self.last_y, event.scenePos().x()-self.last_x, event.scenePos().y()-self.last_y)
+                    itemToDraw = QGraphicsRectItem(self.last_x, self.last_y, event.scenePos().x() - self.last_x,
+                                                   event.scenePos().y() - self.last_y)
                     itemToDraw.setPen(pen)
+                    itemToDraw.setBrush(brush)
                     self.sketchItems.append(itemToDraw)
                     self.scene.addItem(itemToDraw)
 
@@ -503,19 +534,19 @@ class SupervisorUI(QtWidgets.QMainWindow):
     def makeTarget(self, X, Y, obSize, color):
         shapes = []
         shape1 = QGraphicsEllipseItem(int(X - obSize / 2),
-                                     int(Y - obSize / 2), obSize, obSize)
+                                      int(Y - obSize / 2), obSize, obSize)
         shape1.setPen(QPen(color))
         shape1.setBrush(QBrush(color, Qt.SolidPattern))
 
-        obSize = obSize-10
+        obSize = obSize - 10
         shape2 = QGraphicsEllipseItem(int(X - obSize / 2),
-                                     int(Y - obSize / 2), obSize, obSize)
+                                      int(Y - obSize / 2), obSize, obSize)
         shape2.setPen(QPen(self.white))
         shape2.setBrush(QBrush(self.white, Qt.SolidPattern))
 
-        obSize = obSize-10
+        obSize = obSize - 10
         shape3 = QGraphicsEllipseItem(int(X - obSize / 2),
-                                     int(Y - obSize / 2), obSize, obSize)
+                                      int(Y - obSize / 2), obSize, obSize)
         shape3.setPen(QPen(color))
         shape3.setBrush(QBrush(color, Qt.SolidPattern))
         shapes.append(shape1)
@@ -531,36 +562,37 @@ class SupervisorUI(QtWidgets.QMainWindow):
         endArrowX = int(X + math.cos(yaw) * obSize / 2 - math.cos(yaw) * obSize / 4)
         endArrowY = -int(Y + math.sin(yaw) * obSize / 2 - math.sin(yaw) * obSize / 4)
         line1 = QGraphicsLineItem(startArrowX,
-                                 startArrowY,
-                                 endArrowX,
-                                 endArrowY)
+                                  startArrowY,
+                                  endArrowX,
+                                  endArrowY)
         line1.setPen(QPen(self.black, 5))
         lines.append(line1)
         line2 = QGraphicsLineItem(endArrowX,
-                                 endArrowY,
-                                 endArrowX - math.cos(3.14 / 4 + yaw) * obSize / 4,
-                                 endArrowY + math.sin(3.14 / 4 + yaw) * obSize / 4)
+                                  endArrowY,
+                                  endArrowX - math.cos(3.14 / 4 + yaw) * obSize / 4,
+                                  endArrowY + math.sin(3.14 / 4 + yaw) * obSize / 4)
 
         line2.setPen(QPen(self.black, 5))
         lines.append(line2)
         line3 = QGraphicsLineItem(endArrowX,
-                                 endArrowY,
-                                 endArrowX - math.cos(3.14 / 4 - yaw) * obSize / 4,
-                                 endArrowY - math.sin(3.14 / 4 - yaw) * obSize / 4)
+                                  endArrowY,
+                                  endArrowX - math.cos(3.14 / 4 - yaw) * obSize / 4,
+                                  endArrowY - math.sin(3.14 / 4 - yaw) * obSize / 4)
 
         line3.setPen(QPen(self.black, 5))
         lines.append(line3)
         return lines
 
     def confirmTaskCreationCallback(self):
-        if self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]][1]=="True":
+        if self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]][1] == "True":
             if not self.LocationPicked:
                 self.ErrorLBL.show()
             else:
                 yaw = str(math.radians(self.poseYaw))
                 self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[
-                                               self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
-                    self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " +yaw+" "+ str(self.raisePriorityBox.isChecked()))
+                    self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
+                    self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " + yaw + " " + str(
+                    self.raisePriorityBox.isChecked()))
                 if self.LocationPicked:
                     for item in self.LocationTargetShapes:
                         self.scene.removeItem(item)
@@ -579,8 +611,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.LocationPicked = False
         else:
             yaw = str(math.radians(self.poseYaw))
-            self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " +
-                                       str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) + " " + yaw + " " + str(self.raisePriorityBox.isChecked()))
+            self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[
+                self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " +
+                                       str(self.LocationCoordinates[0]) + " " + str(
+                self.LocationCoordinates[1]) + " " + yaw + " " + str(self.raisePriorityBox.isChecked()))
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
                     self.scene.removeItem(item)
@@ -603,7 +637,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
     def taskChangeMainThreadCallback(self, result):
         changes = result.taskMsgs
-        messageString = changes[0].robotName + " Reassigned to "+changes[1].taskName +" " + changes[1].ID+". Previous task was "+changes[0].taskName+" " + changes[0].ID
+        messageString = changes[0].robotName + " Reassigned to " + changes[1].taskName + " " + changes[
+            1].ID + ". Previous task was " + changes[0].taskName + " " + changes[0].ID
         self.TaskSwitchList.addItem(messageString)
         self.TaskSwitchFrame.show()
 
@@ -629,12 +664,33 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.FreeHandSketchButton.setEnabled(True)
         self.LineSketchButton.setEnabled(False)
 
+    def highRiskSketchButtonCallback(self):
+        self.sketchPen = QPen(self.red)
+        self.sketchBrush = QBrush(self.redFill)
+        self.HighRiskSketchButton.setEnabled(False)
+        self.MediumRiskSketchButton.setEnabled(True)
+        self.LowRiskSketchButton.setEnabled(True)
+
+    def mediumRiskSketchButtonCallback(self):
+        self.sketchPen = QPen(self.orange)
+        self.sketchBrush = QBrush(self.orangeFill)
+        self.HighRiskSketchButton.setEnabled(True)
+        self.MediumRiskSketchButton.setEnabled(False)
+        self.LowRiskSketchButton.setEnabled(True)
+
+    def lowRiskSketchButtonCallback(self):
+        self.sketchPen = QPen(self.green)
+        self.sketchBrush = QBrush(self.greenFill)
+        self.HighRiskSketchButton.setEnabled(True)
+        self.MediumRiskSketchButton.setEnabled(True)
+        self.LowRiskSketchButton.setEnabled(False)
+
     def taskComboBoxChanged(self):
-        #print("Combo changed")
+        # print("Combo changed")
         self.ErrorLBL.hide()
         for item in self.LocationTargetShapes:
             self.scene.removeItem(item)
-        if(self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]][1]=="True"):
+        if (self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]][1] == "True"):
             self.SelectLocationBTN.setEnabled(True)
         else:
             self.SelectLocationBTN.setEnabled(False)
@@ -656,7 +712,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.scene.removeItem(item)
 
     def updatePoseLBL(self):
-        self.poseYaw = self.PoseSlider.value()*-1+90
+        self.poseYaw = self.PoseSlider.value() * -1 + 90
         self.PoseDeg.setText(str(self.PoseSlider.value()) + " Deg")
         self.drawPoseArrow()
 
@@ -684,134 +740,138 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.CameraFrame.hide()
 
     def openCam(self, row, col):
-        if col==3:
+        if col == 3:
             self.CamSubscriber.unregister()
             name = self.RobotListTable.item(row, 0).text()
             self.CamSubscriber = rospy.Subscriber("/" + name + "/main_cam/color/image_raw", Image,
-                                                      self.CamRosCallback)
+                                                  self.CamRosCallback)
 
-            self.viewingLBL.setText("Viewing: "+ name)
+            self.viewingLBL.setText("Viewing: " + name)
         self.CameraFrame.show()
 
     def fitToScreen(self, width, height):
-        #The app should have the same aspect ratio regardless of the computer's
-        #aspect ratio
+        # The app should have the same aspect ratio regardless of the computer's
+        # aspect ratio
         desAspX = 16
         desAspY = 9
-        if width/height>desAspX/desAspY:
-            self.windowHeight = int(height*0.9)
-            self.windowWidth = int(self.windowHeight*desAspX/desAspY)
+        if width / height > desAspX / desAspY:
+            self.windowHeight = int(height * 0.9)
+            self.windowWidth = int(self.windowHeight * desAspX / desAspY)
         else:
-            self.windowWidth = int(width*0.9)
-            self.windowHeight = int(self.windowWidth*desAspY/desAspX)
+            self.windowWidth = int(width * 0.9)
+            self.windowHeight = int(self.windowWidth * desAspY / desAspX)
         self.setFixedSize(self.windowWidth, self.windowHeight)
-        self.slideInMenuWidth = self.windowWidth*0.2
-        robotListWidth = self.windowWidth*0.2
-        self.mapWidth = self.windowWidth*0.8
-        createTaskButtonWidth = self.windowWidth*0.12
-        zoneButtonWidth = self.windowWidth*0.07
-        thinButtonHeight = self.windowHeight*0.02
+        self.slideInMenuWidth = self.windowWidth * 0.2
+        robotListWidth = self.windowWidth * 0.2
+        self.mapWidth = self.windowWidth * 0.8
+        createTaskButtonWidth = self.windowWidth * 0.12
+        zoneButtonWidth = self.windowWidth * 0.07
+        thinButtonHeight = self.windowHeight * 0.02
 
-        squareButtonWidth = self.windowWidth*0.025
+        squareButtonWidth = self.windowWidth * 0.025
         squareButtonHeight = squareButtonWidth
-        thinButtonY = self.windowHeight*0.98-thinButtonHeight
-        squareButtonY = self.windowHeight*0.98-squareButtonHeight
+        thinButtonY = self.windowHeight * 0.98 - thinButtonHeight
+        squareButtonY = self.windowHeight * 0.98 - squareButtonHeight
 
-        self.RobotListTable.resize(robotListWidth, self.windowHeight*0.7)
-        self.priorityQueueLBL.move(0,self.windowHeight*0.7)
+        self.RobotListTable.resize(robotListWidth, self.windowHeight * 0.7)
+        self.priorityQueueLBL.move(0, self.windowHeight * 0.7)
         self.priorityQueueLBL.resize(robotListWidth, self.windowHeight * 0.02)
-        self.PriorityQueueTable.move(0,self.windowHeight*0.72)
+        self.PriorityQueueTable.move(0, self.windowHeight * 0.72)
         self.PriorityQueueTable.resize(robotListWidth, self.windowHeight * 0.28)
         self.SupervisorMap.resize(self.mapWidth, self.windowHeight)
         self.SupervisorMap.move(robotListWidth, 0)
-        self.ToggleObstaclesCB.move(robotListWidth+self.windowWidth*0.01, self.windowHeight*0.96)
+        self.ToggleObstaclesCB.move(robotListWidth + self.windowWidth * 0.01, self.windowHeight * 0.96)
         self.ToggleObstaclesCB.resize(createTaskButtonWidth, thinButtonHeight)
 
         self.CreateTaskButton.resize(createTaskButtonWidth, thinButtonHeight)
         self.SketchToggleButton.resize(zoneButtonWidth, thinButtonHeight)
-        self.CreateTaskButton.move(self.windowWidth*0.96-createTaskButtonWidth, thinButtonY)
-        self.SketchToggleButton.move(self.windowWidth*0.78-zoneButtonWidth, thinButtonY)
+        self.CreateTaskButton.move(self.windowWidth * 0.96 - createTaskButtonWidth, thinButtonY)
+        self.SketchToggleButton.move(self.windowWidth * 0.78 - zoneButtonWidth, thinButtonY)
 
         self.HighRiskSketchButton.resize(squareButtonWidth, squareButtonHeight)
         self.MediumRiskSketchButton.resize(squareButtonWidth, squareButtonHeight)
         self.LowRiskSketchButton.resize(squareButtonWidth, squareButtonHeight)
-        self.HighRiskSketchButton.move(self.windowWidth*0.62-squareButtonWidth, squareButtonY)
-        self.MediumRiskSketchButton.move(self.windowWidth*0.65-squareButtonWidth, squareButtonY)
-        self.LowRiskSketchButton.move(self.windowWidth*0.68-squareButtonWidth, squareButtonY)
+        self.HighRiskSketchButton.move(self.windowWidth * 0.62 - squareButtonWidth, squareButtonY)
+        self.MediumRiskSketchButton.move(self.windowWidth * 0.65 - squareButtonWidth, squareButtonY)
+        self.LowRiskSketchButton.move(self.windowWidth * 0.68 - squareButtonWidth, squareButtonY)
 
         self.LineSketchButton.resize(squareButtonWidth, squareButtonHeight)
         self.FreeHandSketchButton.resize(squareButtonWidth, squareButtonHeight)
         self.RectangleSketchButton.resize(squareButtonWidth, squareButtonHeight)
-        self.FreeHandSketchButton.move(self.windowWidth*0.42-squareButtonWidth, squareButtonY)
-        self.LineSketchButton.move(self.windowWidth*0.45-squareButtonWidth, squareButtonY)
-        self.RectangleSketchButton.move(self.windowWidth*0.48-squareButtonWidth, squareButtonY)
+        self.FreeHandSketchButton.move(self.windowWidth * 0.42 - squareButtonWidth, squareButtonY)
+        self.LineSketchButton.move(self.windowWidth * 0.45 - squareButtonWidth, squareButtonY)
+        self.RectangleSketchButton.move(self.windowWidth * 0.48 - squareButtonWidth, squareButtonY)
 
         self.SideMenu.move(self.windowWidth, 0)
         self.SideMenu.resize(self.slideInMenuWidth, self.windowHeight)
         self.CameraFrame.move(robotListWidth, 0)
-        self.CameraFrame.resize(self.windowWidth*0.3, self.windowWidth*0.28)
-        self.CameraView.move(self.CameraFrame.width()*0.01, self.CameraFrame.height()*0.01)
-        self.CameraView.resize(self.CameraFrame.width()*0.98, self.CameraFrame.height()*0.88)
-        self.viewingLBL.move(self.CameraFrame.width()*0.01,self.CameraFrame.height()*0.9)
-        self.viewingLBL.resize(self.CameraFrame.width()*0.5, self.CameraFrame.height()*0.09)
-        self.CloseCameraBTN.move(self.CameraFrame.width()*0.55,self.CameraFrame.height()*0.9)
-        self.CloseCameraBTN.resize(self.CameraFrame.width()*0.4, self.CameraFrame.height()*0.09)
+        self.CameraFrame.resize(self.windowWidth * 0.3, self.windowWidth * 0.28)
+        self.CameraView.move(self.CameraFrame.width() * 0.01, self.CameraFrame.height() * 0.01)
+        self.CameraView.resize(self.CameraFrame.width() * 0.98, self.CameraFrame.height() * 0.88)
+        self.viewingLBL.move(self.CameraFrame.width() * 0.01, self.CameraFrame.height() * 0.9)
+        self.viewingLBL.resize(self.CameraFrame.width() * 0.5, self.CameraFrame.height() * 0.09)
+        self.CloseCameraBTN.move(self.CameraFrame.width() * 0.55, self.CameraFrame.height() * 0.9)
+        self.CloseCameraBTN.resize(self.CameraFrame.width() * 0.4, self.CameraFrame.height() * 0.09)
         self.CameraFrame.hide()
 
-        self.TaskCreatorLabel.move(self.slideInMenuWidth*0.05, self.windowHeight*0.01)
-        self.TaskCreatorLabel.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.04)
-        self.SelectTaskLabel.move(self.slideInMenuWidth*0.05, self.windowHeight*0.05)
+        self.TaskCreatorLabel.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.01)
+        self.TaskCreatorLabel.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.04)
+        self.SelectTaskLabel.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.05)
         self.SelectTaskLabel.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.02)
-        self.SelectTaskCB.move(self.slideInMenuWidth*0.05, self.windowHeight*0.07)
+        self.SelectTaskCB.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.07)
         self.SelectTaskCB.resize(self.slideInMenuWidth * 0.45, self.windowHeight * 0.03)
-        self.raisePriorityBox.move(self.slideInMenuWidth*0.55, self.windowHeight*0.07)
+        self.raisePriorityBox.move(self.slideInMenuWidth * 0.55, self.windowHeight * 0.07)
         self.raisePriorityBox.resize(self.slideInMenuWidth * 0.4, self.windowHeight * 0.03)
 
         self.AssignedRobotTXTLabel.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.11)
         self.AssignedRobotTXTLabel.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.02)
-        self.SelectRobot.move(self.slideInMenuWidth*0.05, self.windowHeight*0.14)
+        self.SelectRobot.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.14)
         self.SelectRobot.resize(self.slideInMenuWidth * 0.90, self.windowHeight * 0.04)
 
-        self.SelectLocationBTN.move(self.slideInMenuWidth*0.05, self.windowHeight*0.19)
+        self.SelectLocationBTN.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.19)
         self.SelectLocationBTN.resize(self.slideInMenuWidth * 0.45, self.windowHeight * 0.04)
-        self.XLocLabel.move(self.slideInMenuWidth*0.52, self.windowHeight*0.19)
-        self.XLocLabel.resize(self.slideInMenuWidth*0.45, self.windowHeight*0.02)
-        self.YLocLabel.move(self.slideInMenuWidth*0.52, self.windowHeight*0.21)
-        self.YLocLabel.resize(self.slideInMenuWidth*0.45, self.windowHeight*0.02)
+        self.XLocLabel.move(self.slideInMenuWidth * 0.52, self.windowHeight * 0.19)
+        self.XLocLabel.resize(self.slideInMenuWidth * 0.45, self.windowHeight * 0.02)
+        self.YLocLabel.move(self.slideInMenuWidth * 0.52, self.windowHeight * 0.21)
+        self.YLocLabel.resize(self.slideInMenuWidth * 0.45, self.windowHeight * 0.02)
 
-        self.PoseSlider.move(self.slideInMenuWidth*0.05, self.windowHeight*0.24)
-        self.PoseSlider.resize(self.slideInMenuWidth*0.7, self.windowHeight*0.04)
-        self.PoseDeg.move(self.slideInMenuWidth*0.80, self.windowHeight*0.24)
-        self.PoseDeg.resize(self.slideInMenuWidth*0.2, self.windowHeight*0.04)
+        self.PoseSlider.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.24)
+        self.PoseSlider.resize(self.slideInMenuWidth * 0.7, self.windowHeight * 0.04)
+        self.PoseDeg.move(self.slideInMenuWidth * 0.80, self.windowHeight * 0.24)
+        self.PoseDeg.resize(self.slideInMenuWidth * 0.2, self.windowHeight * 0.04)
 
-        self.ConfirmTask.move(self.slideInMenuWidth*0.05, self.windowHeight*0.28)
-        self.ConfirmTask.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.04)
+        self.ConfirmTask.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.28)
+        self.ConfirmTask.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.04)
 
-        self.ErrorLBL.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.02)
-        self.ErrorLBL.move(self.slideInMenuWidth*0.05, self.windowHeight*0.32)
+        self.ErrorLBL.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.02)
+        self.ErrorLBL.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.32)
 
         self.TaskSwitchFrame.hide()
-        TaskFrameWidth = self.windowWidth*0.6
-        TaskFrameHeight = self.windowHeight*0.1
+        TaskFrameWidth = self.windowWidth * 0.6
+        TaskFrameHeight = self.windowHeight * 0.1
         self.TaskSwitchFrame.resize(TaskFrameWidth, TaskFrameHeight)
-        self.TaskSwitchFrame.move(self.windowWidth*0.2, self.windowHeight*0.01)
-        self.TaskSwitchList.resize(TaskFrameWidth*0.9-3, TaskFrameHeight*0.8-3)
-        self.TaskSwitchList.move(3, TaskFrameHeight*0.2)#the border is 3px wide
-        self.TaskSwitchOKBTN.resize(TaskFrameWidth*0.1-3, TaskFrameHeight-6)
-        self.TaskSwitchOKBTN.move(TaskFrameWidth*0.9, 3)
-        self.TaskSwitchInfo.resize(TaskFrameWidth*0.9-3, TaskFrameHeight*0.2-3)
+        self.TaskSwitchFrame.move(self.windowWidth * 0.2, self.windowHeight * 0.01)
+        self.TaskSwitchList.resize(TaskFrameWidth * 0.9 - 3, TaskFrameHeight * 0.8 - 3)
+        self.TaskSwitchList.move(3, TaskFrameHeight * 0.2)  # the border is 3px wide
+        self.TaskSwitchOKBTN.resize(TaskFrameWidth * 0.1 - 3, TaskFrameHeight - 6)
+        self.TaskSwitchOKBTN.move(TaskFrameWidth * 0.9, 3)
+        self.TaskSwitchInfo.resize(TaskFrameWidth * 0.9 - 3, TaskFrameHeight * 0.2 - 3)
         self.TaskSwitchInfo.move(3, 3)
+
 
 class SideMenuThread(QThread):
     signal = pyqtSignal('PyQt_PyObject')
+
     def __init__(self):
         QThread.__init__(self)
         self.numSec = 0.2
         self.numSteps = 20
+
     def run(self):
         for x in range(0, self.numSteps):
-            time.sleep(self.numSec/self.numSteps)
+            time.sleep(self.numSec / self.numSteps)
             self.signal.emit(x)
+
 
 if __name__ == '__main__':
     nodeID = "supervisorUI_" + str(int(time.time()))
