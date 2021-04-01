@@ -3,10 +3,11 @@ import rospy
 import rospkg
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
-    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton, QGraphicsItemGroup
+    QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton, QGraphicsItemGroup, \
+    QGraphicsPolygonItem
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel, QIcon, \
-    QImage, QPixmap, QRgba64
+    QImage, QPixmap, QRgba64, QPolygonF
 from PyQt5.QtCore import QThread, pyqtSignal, QPoint, QPointF
 from PyQt5.QtCore import Qt, QLineF, QRectF
 import sys
@@ -137,6 +138,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.sketchBrush = QBrush(self.redFill)
         self.FreeHandSketchButton.setEnabled(False)
         self.HighRiskSketchButton.setEnabled(False)
+        self.firstPolygonPoint = None
+        self.polygonList = []
 
         self.sketchButtonList = [self.RectangleSketchButton, self.FreeHandSketchButton, self.LineSketchButton,
                                  self.LowRiskSketchButton, self.MediumRiskSketchButton, self.HighRiskSketchButton]
@@ -460,21 +463,35 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.drawPoseArrow()
             self.SelectLocationBTN.setEnabled(True)
         elif self.sketchMode:
-            # self.last_x = event.scenePos().x()
-            # self.last_y = event.scenePos().y()
             if event.button() == QtCore.Qt.LeftButton:
                 self.left_click = True
+                if self.firstPolygonPoint:
+                    return
                 self.graphics_group = self.scene.createItemGroup([])
             elif event.button() == QtCore.Qt.RightButton:
                 self.right_click = True
 
     def mapMouseMoveEventHandler(self, event):
         if self.sketchMode:
-            if self.left_click:
-                pen = self.sketchPen
-                pen.setWidth(8)
-                brush = self.sketchBrush
+            pen = self.sketchPen
+            pen.setWidth(8)
+            brush = self.sketchBrush
 
+            # Polygon drawing - unlike the other drawing this one is defining a point on every click so the line gets
+            # drawn on any mouse move after the first point is made
+            if self.drawingModality == 1 and self.firstPolygonPoint:
+                if self.last_x is None:
+                    self.last_x = event.scenePos().x()
+                    self.last_y = event.scenePos().y()
+                else:
+                    self.scene.removeItem(self.sketchItems.pop())
+
+                itemToDraw = QGraphicsLineItem(self.last_x, self.last_y, event.scenePos().x(), event.scenePos().y())
+                itemToDraw.setPen(pen)
+                self.sketchItems.append(itemToDraw)
+                self.scene.addItem(itemToDraw)
+
+            elif self.left_click:
                 # Freehand drawing
                 if self.drawingModality == 0:
                     if self.last_x is None:  # First event.
@@ -489,18 +506,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     # Update the origin for next time.
                     self.last_x = event.scenePos().x()
                     self.last_y = event.scenePos().y()
-                # Line drawing
-                elif self.drawingModality == 1:
-                    if self.last_x is None:
-                        self.last_x = event.scenePos().x()
-                        self.last_y = event.scenePos().y()
-                    else:
-                        self.scene.removeItem(self.sketchItems.pop())
 
-                    itemToDraw = QGraphicsLineItem(self.last_x, self.last_y, event.scenePos().x(), event.scenePos().y())
-                    itemToDraw.setPen(pen)
-                    self.sketchItems.append(itemToDraw)
-                    self.scene.addItem(itemToDraw)
                 # Rectangle drawing
                 elif self.drawingModality == 2:
                     if self.last_x is None:
@@ -516,7 +522,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     self.sketchItems.append(itemToDraw)
                     self.scene.addItem(itemToDraw)
 
-
             elif self.right_click:
                 # erase at mouse intersection
                 # check if mouse is over bounding box of any group in sketchItems
@@ -525,15 +530,74 @@ class SupervisorUI(QtWidgets.QMainWindow):
                         # if it does then remove it from the scene
                         self.scene.removeItem(groups)
 
+
+
     def mapMouseReleaseEventHandler(self, event):
         if self.sketchMode:
-            self.last_x = None
-            self.last_y = None
-            if event.button() == QtCore.Qt.LeftButton:
-                self.left_click = False
-                self.sketchItems.append(self.graphics_group)
-            elif event.button() == QtCore.Qt.RightButton:
-                self.right_click = False
+            # Polygon Drawing
+            if self.drawingModality == 1:
+                pen = self.sketchPen
+                pen.setWidth(8)
+                end_click_tol = 10
+                if event.button() == QtCore.Qt.LeftButton:
+                    newPoint = event.scenePos()
+                    self.polygonList.append(newPoint)
+                    self.left_click = False
+
+                    if not self.firstPolygonPoint:
+                        self.firstPolygonPoint = event.scenePos()
+
+                    else:
+                        # add the intermediate line
+                        self.graphics_group.addToGroup(self.sketchItems.pop())
+
+                        # check for closing of polygon
+                        dif = self.firstPolygonPoint-QPointF(newPoint.x(), newPoint.y())
+                        if abs(dif.x()) < end_click_tol and abs(dif.y()) < end_click_tol:
+                            # for all of the ellipses in the graphics group
+                            # add the x,y to a QPolygonF
+                            # create a QGraphicsPolygon
+                            # color and fill
+                            # append that to sketch items
+                            polygon = QPolygonF()
+                            for point in self.polygonList:
+                                polygon << point
+                            polygonToDraw = QGraphicsPolygonItem(polygon)
+                            polygonToDraw.setPen(pen)
+                            polygonToDraw.setBrush(self.sketchBrush)
+
+                            self.sketchItems.append(polygonToDraw)
+                            self.scene.addItem(polygonToDraw)
+                            self.last_x = None
+                            self.last_y = None
+
+                            self.scene.removeItem(self.graphics_group)
+                            self.firstPolygonPoint = None
+                            self.polygonList = []
+
+                            return
+
+                        itemToDraw = QGraphicsEllipseItem(newPoint.x(), newPoint.y(), 15, 15)
+                        itemToDraw.setPen(pen)
+                        self.graphics_group.addToGroup(itemToDraw)
+                        self.last_x = None
+                        self.last_y = None
+
+                elif event.button() == QtCore.Qt.RightButton and self.firstPolygonPoint:
+                    # clear the polygon
+                    self.right_click = False
+                    self.scene.removeItem(self.graphics_group)
+                    self.firstPolygonPoint = None
+                    self.polygonList = []
+
+            else:
+                self.last_x = None
+                self.last_y = None
+                if event.button() == QtCore.Qt.LeftButton:
+                    self.left_click = False
+                    self.sketchItems.append(self.graphics_group)
+                elif event.button() == QtCore.Qt.RightButton:
+                    self.right_click = False
 
 
     def makeTarget(self, X, Y, obSize, color):
