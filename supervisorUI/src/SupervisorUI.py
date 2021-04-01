@@ -490,8 +490,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 itemToDraw.setPen(pen)
                 self.sketchItems.append(itemToDraw)
                 self.scene.addItem(itemToDraw)
+                return
 
-            elif self.left_click:
+            if self.left_click:
                 # Freehand drawing
                 if self.drawingModality == 0:
                     if self.last_x is None:  # First event.
@@ -530,22 +531,25 @@ class SupervisorUI(QtWidgets.QMainWindow):
                         # if it does then remove it from the scene
                         self.scene.removeItem(groups)
 
-
-
     def mapMouseReleaseEventHandler(self, event):
         if self.sketchMode:
             # Polygon Drawing
             if self.drawingModality == 1:
                 pen = self.sketchPen
                 pen.setWidth(8)
-                end_click_tol = 10
+                end_click_tol = 15
                 if event.button() == QtCore.Qt.LeftButton:
                     newPoint = event.scenePos()
                     self.polygonList.append(newPoint)
                     self.left_click = False
 
+                    itemToDraw = QGraphicsEllipseItem(newPoint.x(), newPoint.y(), 25, 25)
+                    itemToDraw.setPen(QPen(self.gray))
+                    itemToDraw.setBrush(QBrush(self.gray))
+                    self.graphics_group.addToGroup(itemToDraw)
+
                     if not self.firstPolygonPoint:
-                        self.firstPolygonPoint = event.scenePos()
+                        self.firstPolygonPoint = newPoint
 
                     else:
                         # add the intermediate line
@@ -554,51 +558,57 @@ class SupervisorUI(QtWidgets.QMainWindow):
                         # check for closing of polygon
                         dif = self.firstPolygonPoint-QPointF(newPoint.x(), newPoint.y())
                         if abs(dif.x()) < end_click_tol and abs(dif.y()) < end_click_tol:
-                            # for all of the ellipses in the graphics group
-                            # add the x,y to a QPolygonF
-                            # create a QGraphicsPolygon
-                            # color and fill
-                            # append that to sketch items
-                            polygon = QPolygonF()
-                            for point in self.polygonList:
-                                polygon << point
-                            polygonToDraw = QGraphicsPolygonItem(polygon)
-                            polygonToDraw.setPen(pen)
-                            polygonToDraw.setBrush(self.sketchBrush)
 
-                            self.sketchItems.append(polygonToDraw)
-                            self.scene.addItem(polygonToDraw)
-                            self.last_x = None
-                            self.last_y = None
+                            # create add add the polygon from the points in self.polygonList
+                            self.create_fill_polygon(pen)
 
+                            # reset polygon tracking variables
                             self.scene.removeItem(self.graphics_group)
                             self.firstPolygonPoint = None
                             self.polygonList = []
 
-                            return
+                        else:
+                            itemToDraw = QGraphicsEllipseItem(newPoint.x(), newPoint.y(), 25, 25)
+                            itemToDraw.setPen(QPen(self.gray))
+                            itemToDraw.setBrush(QBrush(self.gray))
+                            self.graphics_group.addToGroup(itemToDraw)
 
-                        itemToDraw = QGraphicsEllipseItem(newPoint.x(), newPoint.y(), 15, 15)
-                        itemToDraw.setPen(pen)
-                        self.graphics_group.addToGroup(itemToDraw)
                         self.last_x = None
                         self.last_y = None
 
                 elif event.button() == QtCore.Qt.RightButton and self.firstPolygonPoint:
                     # clear the polygon
                     self.right_click = False
+                    # add the intermediate line so it gets removed
+                    self.graphics_group.addToGroup(self.sketchItems.pop())
                     self.scene.removeItem(self.graphics_group)
                     self.firstPolygonPoint = None
                     self.polygonList = []
 
             else:
-                self.last_x = None
-                self.last_y = None
                 if event.button() == QtCore.Qt.LeftButton:
                     self.left_click = False
                     self.sketchItems.append(self.graphics_group)
                 elif event.button() == QtCore.Qt.RightButton:
                     self.right_click = False
 
+            self.last_x = None
+            self.last_y = None
+
+    def create_fill_polygon(self, pen):
+        # for all of the ellipses in the graphics group
+        # add the x,y to a QPolygonF
+        # create a QGraphicsPolygon
+        # color and fill
+        # append that to sketch items
+        polygon = QPolygonF()
+        for point in self.polygonList:
+            polygon << point
+        polygonToDraw = QGraphicsPolygonItem(polygon)
+        polygonToDraw.setPen(pen)
+        polygonToDraw.setBrush(self.sketchBrush)
+        self.sketchItems.append(polygonToDraw)
+        self.scene.addItem(polygonToDraw)
 
     def makeTarget(self, X, Y, obSize, color):
         shapes = []
