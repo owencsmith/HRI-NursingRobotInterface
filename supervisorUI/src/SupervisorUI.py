@@ -465,6 +465,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         elif self.sketchMode:
             if event.button() == QtCore.Qt.LeftButton:
                 self.left_click = True
+                # We use the graphics group to hold all polygon pieces so we dont create a new one if mid process
                 if self.firstPolygonPoint:
                     return
                 self.graphics_group = self.scene.createItemGroup([])
@@ -543,10 +544,15 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     self.polygonList.append(newPoint)
                     self.left_click = False
 
-                    itemToDraw = QGraphicsEllipseItem(newPoint.x(), newPoint.y(), 25, 25)
-                    itemToDraw.setPen(QPen(self.gray))
-                    itemToDraw.setBrush(QBrush(self.gray))
-                    self.graphics_group.addToGroup(itemToDraw)
+                    d = 25
+                    try:
+                        itemToDraw = QGraphicsEllipseItem(newPoint.x() - int(d / 2), newPoint.y() - int(d / 2), d, d)
+                        itemToDraw.setPen(QPen(self.gray))
+                        itemToDraw.setBrush(QBrush(self.gray))
+                        self.graphics_group.addToGroup(itemToDraw)
+                    except:
+                        # do nothing if the ellipse fails to draw
+                        pass
 
                     if not self.firstPolygonPoint:
                         self.firstPolygonPoint = newPoint
@@ -567,12 +573,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
                             self.firstPolygonPoint = None
                             self.polygonList = []
 
-                        else:
-                            itemToDraw = QGraphicsEllipseItem(newPoint.x(), newPoint.y(), 25, 25)
-                            itemToDraw.setPen(QPen(self.gray))
-                            itemToDraw.setBrush(QBrush(self.gray))
-                            self.graphics_group.addToGroup(itemToDraw)
-
                         self.last_x = None
                         self.last_y = None
 
@@ -584,6 +584,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     self.scene.removeItem(self.graphics_group)
                     self.firstPolygonPoint = None
                     self.polygonList = []
+
+                elif event.button() == QtCore.Qt.RightButton:
+                    self.right_click = False
 
             else:
                 if event.button() == QtCore.Qt.LeftButton:
