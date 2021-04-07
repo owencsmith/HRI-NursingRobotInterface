@@ -466,9 +466,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
             if event.button() == QtCore.Qt.LeftButton:
                 self.left_click = True
                 # We use the graphics group to hold all polygon pieces so we dont create a new one if mid process
-                if self.firstPolygonPoint:
-                    return
-                self.graphics_group = self.scene.createItemGroup([])
+                if not self.firstPolygonPoint:
+                    self.graphics_group = self.scene.createItemGroup([])
             elif event.button() == QtCore.Qt.RightButton:
                 self.right_click = True
 
@@ -478,13 +477,13 @@ class SupervisorUI(QtWidgets.QMainWindow):
             pen.setWidth(8)
             brush = self.sketchBrush
 
-            # Polygon drawing - unlike the other drawing this one is defining a point on every click so the line gets
-            # drawn on any mouse move after the first point is made
+            # Polygon drawing - After the first vertex of the polygon is defined,
+            # keep redrawing the line from the last point to the current point
             if self.drawingModality == 1 and self.firstPolygonPoint:
-                if self.last_x is None:
+                if self.last_x is None:  # This gets set to None everytime a new point is added or a polygon is closed
                     self.last_x = event.scenePos().x()
                     self.last_y = event.scenePos().y()
-                else:
+                else:  # Assumes the last thing added to the sketchItem list was the line
                     self.scene.removeItem(self.sketchItems.pop())
 
                 itemToDraw = QGraphicsLineItem(self.last_x, self.last_y, event.scenePos().x(), event.scenePos().y())
@@ -552,6 +551,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                         self.graphics_group.addToGroup(itemToDraw)
                     except:
                         # do nothing if the ellipse fails to draw
+                        # should only occur near the edges of the map if at all
                         pass
 
                     if not self.firstPolygonPoint:
