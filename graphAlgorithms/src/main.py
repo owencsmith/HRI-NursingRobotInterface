@@ -1,5 +1,6 @@
 # Main and helper function
 
+import os.path
 from PIL import Image
 import numpy as np
 import copy
@@ -14,7 +15,8 @@ def load_map(file_path, resolution_scale):
         where 0 represents obstacles and 1 represents free space
     '''
     # Load the image with grayscale
-    img = Image.open(file_path).convert('L')
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    img = Image.open(os.path.join(script_dir, file_path)).convert('L')
     # Rescale the image
     size_x, size_y = img.size
     new_x, new_y  = int(size_x*resolution_scale), int(size_y*resolution_scale)
