@@ -452,10 +452,16 @@ class TrapezoidalDecomposition:
         mid_pt_row = (min_row+max_row)/2
         mid_pt_col = (min_col+max_col)/2
 
-        return (mid_pt_row, mid_pt_col), visited
-
-
-
+        if min_col==min_dimension:
+            return None, visited
+        elif max_col==self.size_col-1:
+            return None,visited
+        elif min_row==min_dimension:
+            return None, visited
+        elif max_row==self.size_row-1:
+            return None, visited
+        else:
+            return (mid_pt_row, mid_pt_col), visited
 
 
         #     c = 0

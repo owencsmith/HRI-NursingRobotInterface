@@ -59,9 +59,10 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list()):
     #     ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='r'))
 
     for cent in centers:
-        x = cent[0]
-        y = cent[1]
-        ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='r'))
+        if cent is not None:
+            x = cent[0]
+            y = cent[1]
+            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='r'))
 
     plt.title(title)
     plt.axis('scaled')
