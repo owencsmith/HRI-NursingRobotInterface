@@ -374,7 +374,38 @@ class TrapezoidalDecomposition:
                     if self.is_vertex((r,c),0,self.size_row,self.size_col):
                         vertices.append((r,c))
 
-        return vertices
+        # return vertices
+
+        for vertice in vertices:
+            # get left and right lines from vertices
+            row = vertice[0]
+            col = vertice[1]
+            left_line = list()
+            right_line = list()
+            #left
+            if col!=0:
+                for c in range(col-1,-1,-1):
+                    if self.map_array[row,c] == 1:
+                        left_line.append((row,c))
+                    else:
+                        line_list_for_boundaries.append(left_line)
+                        break
+
+            if col!=self.size_col-1:
+                for c in range(col+1,self.size_col):
+                    if self.map_array[row,c] == 1:
+                        right_line.append((row,c))
+                    else:
+                        line_list_for_boundaries.append(right_line)
+                        break
+
+        return vertices, line_list_for_boundaries
+
+
+
+
+
+
         #     c = 0
         #     while c < self.size_col:  # for c in range(self.size_col-1):
         #         print("row: " + str(r) + " col: " + str(c))

@@ -27,7 +27,7 @@ def load_map(file_path, resolution_scale):
     # Result 2D numpy array
     return map_array
 
-def draw_path(grid, title, lines = list()):
+def draw_path(grid, title, lines = list(), vertices = list()):
     # Visualization of the found path using matplotlib
     fig, ax = plt.subplots(1)
     ax.margins()
@@ -47,16 +47,16 @@ def draw_path(grid, title, lines = list()):
     # ax.add_patch(Rectangle((goal[1]-0.5, goal[0]-0.5),1,1,edgecolor='k',facecolor='r'))  # goal
     # Graph settings
 
-    # for line in lines:
-    #     for pt in line:
-    #         x = pt[0]
-    #         y = pt[1]
-    #         ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='k', facecolor='b'))
+    for line in lines:
+        for pt in line:
+            x = pt[0]
+            y = pt[1]
+            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='k', facecolor='b'))
 
-    for pt in lines:
-        x = pt[0]
-        y = pt[1]
-        ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='k', facecolor='b'))
+    for vert in vertices:
+        x = vert[0]
+        y = vert[1]
+        ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='k', facecolor='r'))
 
 
     plt.title(title)
@@ -74,8 +74,8 @@ if __name__ == "__main__":
     draw_path(map_array,"Hospital Array")
 
     trap_decomp_graph = TrapezoidalDecomposition(map_array)
-    line_lists_for_boundaries = trap_decomp_graph.create_trapezoids() # trap_decomp_graph = TrapezoidalDecomposition(map_array)
-    draw_path(map_array,"Hospital Array",line_lists_for_boundaries)
+    vertices, line_lists_for_boundaries = trap_decomp_graph.create_trapezoids() # trap_decomp_graph = TrapezoidalDecomposition(map_array)
+    draw_path(map_array,"Hospital Array",line_lists_for_boundaries, vertices)
 
 
     # # Planning class
