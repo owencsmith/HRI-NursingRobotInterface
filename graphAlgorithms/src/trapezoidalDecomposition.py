@@ -167,7 +167,8 @@ class TrapezoidalDecomposition:
                     q = list()
                     q.append([r,c])
                     center, visited = self.iterative_bfs(self.map_array,q,visited,0,self.size_row-1,self.size_col-1)
-                    centers.append(center)
+                    if center is not None:
+                        centers.append((int(center[0]),int(center[1])))
 
         return centers
 
