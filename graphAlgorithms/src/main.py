@@ -2,6 +2,8 @@
 
 from PIL import Image
 import numpy as np
+import copy
+
 from trapezoidalDecomposition import TrapezoidalDecomposition
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
@@ -85,10 +87,14 @@ if __name__ == "__main__":
     start = (200, 75)
     goal  = (30, 250)
     map_array = load_map("HospitalMapCleaned_filledin_cropped.png", 0.3)
+    origional_map_array = copy.deepcopy(map_array)
     draw_path(map_array,"Hospital Array")
 
     trap_decomp_graph = TrapezoidalDecomposition(map_array)
     vertices, line_lists_for_boundaries = trap_decomp_graph.create_trapezoids() # trap_decomp_graph = TrapezoidalDecomposition(map_array)
     map_array_updated = add_in_lines(map_array, line_lists_for_boundaries)
     centers = trap_decomp_graph.find_centers(map_array_updated)
-    draw_path(map_array,"Hospital Array",line_lists_for_boundaries, vertices, centers)
+    draw_path(origional_map_array,"Hospital Array",line_lists_for_boundaries, vertices, centers)
+    trap_decomp_graph.clear_lines_from_map(origional_map_array)
+    trap_decomp_graph.create_visibility_graph(centers)
+    trap_decomp_graph.draw_map()
