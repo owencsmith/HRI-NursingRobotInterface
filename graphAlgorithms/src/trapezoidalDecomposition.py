@@ -402,6 +402,58 @@ class TrapezoidalDecomposition:
         return vertices, line_list_for_boundaries
 
 
+    def find_centers(self, updated_map_array):
+
+        self.map_array = updated_map_array
+
+        visited = list()
+        queue = list()
+        centers = list()
+
+        for r in range(1, self.size_row - 1):
+            for c in range(1, self.size_col - 1):
+                if self.map_array[r,c] == 1 and [r,c] not in visited:
+                    q = list()
+                    q.append([r,c])
+                    center, visited = self.iterative_bfs(self.map_array,q,visited,0,self.size_row-1,self.size_col-1)
+                    centers.append(center)
+
+        return centers
+
+    def iterative_bfs(self, grid, queue, visited, min_dimension, max_dimension_row,
+                      max_dimension_col):
+
+        this_bfs_visited = list()
+
+        while queue:
+
+            # FIFO popping
+            node = queue.pop(0)
+            visited.append(node)
+            this_bfs_visited.append(node)
+
+            queue, parent_dict = self.four_connected(node, visited, min_dimension, max_dimension_row, max_dimension_col, queue, grid, dict())
+
+        min_row = self.size_row
+        min_col = self.size_col
+        max_row = 0
+        max_col = 0
+
+        for point in this_bfs_visited:
+            if point[0] < min_row:
+                min_row = point[0]
+            if point[0] > max_row:
+                max_row = point[0]
+            if point[1] < min_col:
+                min_col = point[1]
+            if point[1] > max_col:
+                max_col = point[1]
+
+        mid_pt_row = (min_row+max_row)/2
+        mid_pt_col = (min_col+max_col)/2
+
+        return (mid_pt_row, mid_pt_col), visited
+
 
 
 
@@ -525,46 +577,65 @@ class TrapezoidalDecomposition:
         free_counter = 0
         obstacle_counter = 0
 
+        right_free_counter = 0
+        right_obstacle_counter = 0
+        left_free_counter = 0
+        left_obstacle_counter = 0
+        vert_free_counter = 0
+        vert_obstacle_counter = 0
+
         if node[0] == min_dimension and node[1] == min_dimension:
 
             node_to_add = [min_dimension, min_dimension + 1]
             if self.map_array[node_to_add[0],node_to_add[1]] == 1:
                 free_counter+=1
+                right_free_counter+=1
             else:
                 obstacle_counter+=1
-
+                right_obstacle_counter+=1
 
             node_to_add = [min_dimension + 1, min_dimension]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [min_dimension+1, min_dimension+1]
             if self.map_array[node_to_add[0],node_to_add[1]] == 1:
                 free_counter+=1
+                right_free_counter+=1
             else:
                 obstacle_counter+=1
+                right_obstacle_counter+=1
 
 
         elif node[0] == max_dimension_row and node[1] == max_dimension_col:
+
             node_to_add = [max_dimension_row, max_dimension_col - 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [max_dimension_row-1, max_dimension_col-1]
             if self.map_array[node_to_add[0],node_to_add[1]] == 1:
                 free_counter+=1
+                left_free_counter+=1
             else:
                 obstacle_counter+=1
+                left_obstacle_counter+=1
 
             node_to_add = [max_dimension_row - 1, max_dimension_col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
 
         elif node[0] == min_dimension and node[1] == max_dimension_col:
@@ -572,20 +643,26 @@ class TrapezoidalDecomposition:
             node_to_add = [min_dimension + 1, max_dimension_col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [min_dimension+1, max_dimension_col-1]
             if self.map_array[node_to_add[0],node_to_add[1]] == 1:
                 free_counter+=1
+                left_free_counter+=1
             else:
                 obstacle_counter+=1
+                left_obstacle_counter+=1
 
             node_to_add = [min_dimension, max_dimension_col - 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
 
         elif node[0] == max_dimension_row and node[1] == min_dimension:
@@ -593,20 +670,26 @@ class TrapezoidalDecomposition:
             node_to_add = [max_dimension_row, min_dimension + 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
             node_to_add = [max_dimension_row-1, min_dimension+1]
             if self.map_array[node_to_add[0],node_to_add[1]] == 1:
                 free_counter+=1
+                right_free_counter+=1
             else:
                 obstacle_counter+=1
+                right_obstacle_counter+=1
 
             node_to_add = [max_dimension_row - 1, min_dimension]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
 
         elif node[0] == min_dimension:
@@ -614,32 +697,42 @@ class TrapezoidalDecomposition:
             node_to_add = [row, col + 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
             node_to_add = [row+1, col+1]
             if self.map_array[node_to_add[0],node_to_add[1]] == 1:
                 free_counter+=1
+                right_free_counter+=1
             else:
                 obstacle_counter+=1
+                right_obstacle_counter+=1
 
             node_to_add = [row + 1, col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [row+1, col-1]
             if self.map_array[node_to_add[0],node_to_add[1]] == 1:
                 free_counter+=1
+                left_free_counter+=1
             else:
                 obstacle_counter+=1
+                left_obstacle_counter+=1
 
             node_to_add = [row, col - 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
 
         elif node[1] == min_dimension:
@@ -647,32 +740,42 @@ class TrapezoidalDecomposition:
             node_to_add = [row, col + 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
             node_to_add = [row+1,col+1]
             if self.map_array[node_to_add[0],node_to_add[1]] == 1:
                 free_counter+=1
+                right_free_counter+=1
             else:
                 obstacle_counter+=1
+                right_obstacle_counter+=1
 
             node_to_add = [row + 1, col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [row - 1, col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [row - 1, col + 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
 
         elif node[0] == max_dimension_row:
@@ -680,64 +783,85 @@ class TrapezoidalDecomposition:
             node_to_add = [row, col + 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
             node_to_add = [row, col - 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [row-1,col-1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [row - 1, col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [row-1,col+1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
 
         elif node[1] == max_dimension_col:
+
             node_to_add = [row + 1, col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [row+1,col-1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [row, col - 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [row-1,col-1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [row - 1, col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
 
         else:
@@ -745,54 +869,75 @@ class TrapezoidalDecomposition:
             node_to_add = [row, col + 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
             node_to_add = [row+1,col+1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
             node_to_add = [row + 1, col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [row+1,col-1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [row, col - 1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [row-1,col-1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                left_free_counter+=1
             else:
                 obstacle_counter += 1
+                left_obstacle_counter+=1
 
             node_to_add = [row - 1, col]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                vert_free_counter+=1
             else:
                 obstacle_counter += 1
+                vert_obstacle_counter+=1
 
             node_to_add = [row-1,col+1]
             if self.map_array[node_to_add[0], node_to_add[1]] == 1:
                 free_counter += 1
+                right_free_counter+=1
             else:
                 obstacle_counter += 1
+                right_obstacle_counter+=1
 
-        ratio = free_counter/(free_counter+obstacle_counter)
-        if ratio>=0.5:
-            return True
+
+        if abs(right_free_counter-left_free_counter)>1:
+        # if right_free_counter!=left_free_counter:
+            ratio = free_counter/(free_counter+obstacle_counter)
+            if ratio>=0.5:
+                return True
+            else:
+                return False
         else:
             return False
 
@@ -914,5 +1059,207 @@ class TrapezoidalDecomposition:
     #     #
     #     #        Now in for loop jump ahead to current col being the col at the end of the obstacle
     #     #
+
+    def four_connected(self, node, visited, min_dimension, max_dimension_row, max_dimension_col, queue, grid, parent_dict):
+
+        row = node[0]
+        col = node[1]
+
+        if node[0] == min_dimension and node[1] == min_dimension:
+
+            node_to_add = [min_dimension, min_dimension + 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [min_dimension + 1, min_dimension]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+
+        elif node[0] == max_dimension_row and node[1] == max_dimension_col:
+            node_to_add = [max_dimension_row, max_dimension_col - 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [max_dimension_row - 1, max_dimension_col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+
+        elif node[0] == min_dimension and node[1] == max_dimension_col:
+
+            node_to_add = [min_dimension + 1, max_dimension_col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [min_dimension, max_dimension_col - 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+
+        elif node[0] == max_dimension_row and node[1] == min_dimension:
+
+            node_to_add = [max_dimension_row, min_dimension + 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [max_dimension_row - 1, min_dimension]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+
+        elif node[0] == min_dimension:
+
+            node_to_add = [row, col + 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row + 1, col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row, col - 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+
+        elif node[1] == min_dimension:
+
+            node_to_add = [row, col + 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row + 1, col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row - 1, col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+
+        elif node[0] == max_dimension_row:
+
+            node_to_add = [row, col + 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row, col - 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row - 1, col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+
+        elif node[1] == max_dimension_col:
+            node_to_add = [row + 1, col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row, col - 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row - 1, col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+
+        else:
+
+            node_to_add = [row, col + 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row + 1, col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row, col - 1]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+            node_to_add = [row - 1, col]
+            if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] ==1 and node_to_add not in visited:
+                parent_dict[str(node_to_add)] = node
+                queue.append(node_to_add)
+            # elif node_to_add in queue:
+            #     parent_dict[str(node_to_add)] = node
+
+        return queue, parent_dict
+
+
 
 

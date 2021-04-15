@@ -27,7 +27,7 @@ def load_map(file_path, resolution_scale):
     # Result 2D numpy array
     return map_array
 
-def draw_path(grid, title, lines = list(), vertices = list()):
+def draw_path(grid, title, lines = list(), vertices = list(), centers = list()):
     # Visualization of the found path using matplotlib
     fig, ax = plt.subplots(1)
     ax.margins()
@@ -51,13 +51,17 @@ def draw_path(grid, title, lines = list(), vertices = list()):
         for pt in line:
             x = pt[0]
             y = pt[1]
-            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='k', facecolor='b'))
+            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='b'))
 
-    for vert in vertices:
-        x = vert[0]
-        y = vert[1]
-        ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='k', facecolor='r'))
+    # for vert in vertices:
+    #     x = vert[0]
+    #     y = vert[1]
+    #     ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='r'))
 
+    for cent in centers:
+        x = cent[0]
+        y = cent[1]
+        ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='r'))
 
     plt.title(title)
     plt.axis('scaled')
@@ -65,17 +69,28 @@ def draw_path(grid, title, lines = list(), vertices = list()):
     plt.show()
 
 
+def add_in_lines(map_array, lines):
+    for line in lines:
+        for pt in line:
+            x = pt[0]
+            y = pt[1]
+            map_array[x,y] = 0.5
+
+    return map_array
+
 if __name__ == "__main__":
     # Load the map
     start = (200, 75)
     goal  = (30, 250)
-    map_array = load_map("HospitalMapCleaned_filledin_cropped.png", 0.1)
+    map_array = load_map("HospitalMapCleaned_filledin_cropped.png", 0.3)
     # map_array = load_map("test_map_simple.png", 0.1)
     draw_path(map_array,"Hospital Array")
 
     trap_decomp_graph = TrapezoidalDecomposition(map_array)
     vertices, line_lists_for_boundaries = trap_decomp_graph.create_trapezoids() # trap_decomp_graph = TrapezoidalDecomposition(map_array)
-    draw_path(map_array,"Hospital Array",line_lists_for_boundaries, vertices)
+    map_array_updated = add_in_lines(map_array, line_lists_for_boundaries)
+    centers = trap_decomp_graph.find_centers(map_array_updated)
+    draw_path(map_array,"Hospital Array",line_lists_for_boundaries, vertices, centers)
 
 
     # # Planning class
