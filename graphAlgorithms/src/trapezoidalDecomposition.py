@@ -1,8 +1,8 @@
 import numpy as np
-import networkx as nx
 import matplotlib.pyplot as plt
 import math
 from scipy import spatial
+import copy
 
 
 class TrapezoidalDecomposition:
@@ -11,108 +11,6 @@ class TrapezoidalDecomposition:
         self.map_array = map_array  # map array, 1->free, 0->obstacle
         self.size_row = map_array.shape[0]  # map size
         self.size_col = map_array.shape[1]
-        self.graph = nx.Graph()
-        self.samples = list()
-
-    def draw_map(self):
-        '''Visualization of the result
-        '''
-        # Create empty map
-        fig, ax = plt.subplots()
-        img = 255 * np.dstack((self.map_array, self.map_array, self.map_array))
-        ax.imshow(img)
-
-
-        # Draw graph
-        # get node position (swap coordinates)
-        node_pos = np.array(self.samples)[:, [1, 0]]
-        pos = dict(zip(range(len(self.samples)), node_pos))
-        # pos['start'] = (self.samples[-2][1], self.samples[-2][0])
-        # pos['goal'] = (self.samples[-1][1], self.samples[-1][0])
-
-        # draw constructed graph
-        nx.draw(self.graph, pos, node_size=3, node_color='y', edge_color='y', ax=ax)
-
-        # If found a path
-        # if self.path:
-        #     # add temporary start and goal edge to the path
-        #     final_path_edge = list(zip(self.path[:-1], self.path[1:]))
-        #     nx.draw_networkx_nodes(self.graph, pos=pos, nodelist=self.path, node_size=8, node_color='b')
-        #     nx.draw_networkx_edges(self.graph, pos=pos, edgelist=final_path_edge, width=2, edge_color='b')
-
-        # draw start and goal
-        # nx.draw_networkx_nodes(self.graph, pos=pos, nodelist=['start'], node_size=12, node_color='g')
-        # nx.draw_networkx_nodes(self.graph, pos=pos, nodelist=['goal'], node_size=12, node_color='r')
-
-        # show image
-        plt.axis('on')
-        ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
-        plt.show()
-
-    def check_collision(self, p1, p2):
-        '''Check if the path between two points collide with obstacles
-        arguments:
-            p1 - point 1, [row, col]
-            p2 - point 2, [row, col]
-
-        return:
-            True if two points can be connected
-        '''
-
-        # get the difference in the row and column values
-        diff_row = p2[0] - p1[0]
-        diff_col = p2[1] - p1[1]
-
-        # in this implementation, I find which difference is larger.
-        # the larger difference becomes the increment by 1, and the smaller
-        # one is a fraction of that increment.  This allows the check to move
-        # along the hypotenuse between 2 points (the edge) but travel in increments
-        # of 1 since the graph's occupancy exists in a discrete space not continuous
-
-        if abs(diff_col) > abs(diff_row):
-            inc_total = abs(diff_col)
-            increment_row_by = diff_row / abs(diff_col)
-            increment_col_by = math.copysign(1, diff_col)
-        elif abs(diff_col) < abs(diff_row):
-            inc_total = abs(diff_row)
-            increment_row_by = math.copysign(1, diff_row)
-            increment_col_by = diff_col / abs(diff_row)
-        else:
-            inc_total = abs(diff_row)
-            increment_row_by = math.copysign(1, diff_row)
-            increment_col_by = math.copysign(1, diff_col)
-
-        # increments through the path from one node to the other
-        for i in range(int(inc_total)):
-            check_row = p1[0] + i * increment_row_by
-            check_col = p1[1] + i * increment_col_by
-
-            # if any of the increments are an obstacle, return false if there is a collision
-            if self.map_array[int(check_row), int(check_col)] == 0:
-                return False
-
-        return True
-
-    def dis(self, point1, point2):
-        '''Calculate the euclidean distance between two points
-        arguments:
-            p1 - point 1, [row, col]
-            p2 - point 2, [row, col]
-
-        return:
-            euclidean distance between two points
-        '''
-        return math.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
-
-    def sample(self, n_pts=1000, sampling_method="uniform"):
-        '''Construct a graph for PRM
-        arguments:
-            n_pts - number of points try to sample,
-                    not the number of final sampled points
-            sampling_method - name of the chosen sampling method
-
-        Sample points, connect, and add nodes and edges to self.graph
-        '''
 
     def create_trapezoids(self):
 
@@ -151,26 +49,37 @@ class TrapezoidalDecomposition:
                         line_list_for_boundaries.append(right_line)
                         break
 
-        return vertices, line_list_for_boundaries
+        self.vertices = vertices
+        self.line_list_for_boundaries = line_list_for_boundaries
+        #return vertices, line_list_for_boundaries
 
+    def find_centers(self):
 
-    def find_centers(self, updated_map_array):
+        # Find the vertuces and edges of the trapezoids
+        self.create_trapezoids()
 
-        self.map_array = updated_map_array
+        # Draw the trapezoid boundaries in the map
+        updated_map_array = copy.deepcopy(self.map_array)
+        for line in self.line_list_for_boundaries:
+            for pt in line:
+                updated_map_array[pt[0],pt[1]] = 0.5
 
+        # List for visited points and center points
         visited = list()
         centers = list()
 
+        # For each point that is not visited use bfs to find the entire area and return the center
         for r in range(1, self.size_row - 1):
             for c in range(1, self.size_col - 1):
-                if self.map_array[r,c] == 1 and [r,c] not in visited:
+                if updated_map_array[r,c] == 1 and [r,c] not in visited:
                     q = list()
                     q.append([r,c])
-                    center, visited = self.iterative_bfs(self.map_array,q,visited,0,self.size_row-1,self.size_col-1)
+                    center, visited = self.iterative_bfs(updated_map_array,q,visited,0,self.size_row-1,self.size_col-1)
                     if center is not None:
                         centers.append((int(center[0]),int(center[1])))
 
-        return centers
+        self.centers = centers
+        return self.centers, self.vertices
 
     def iterative_bfs(self, grid, queue, visited, min_dimension, max_dimension_row,
                       max_dimension_col):
@@ -214,59 +123,6 @@ class TrapezoidalDecomposition:
             return None, visited
         else:
             return (mid_pt_row, mid_pt_col), visited
-
-
-    # def create_visibility_graph(self, centers):
-    #
-    #     weighted_pairs = list()
-    #
-    #     for check_node_index in range(len(centers)):
-    #         for other_index in range(len(centers)):
-    #             if check_node_index!=other_index and centers[check_node_index] is not None and centers[other_index] is not None:
-    #                 if self.check_collision(centers[check_node_index],centers[other_index]):
-    #                     already_in_pairs = False
-    #                     for pair in weighted_pairs:
-    #                         if (pair[0] == centers[check_node_index] and pair[1] == centers[other_index]) or (pair[1] == centers[check_node_index] and pair[0] == centers[other_index]):
-    #                             already_in_pairs = True
-    #
-    #                     if not already_in_pairs:
-    #                         weighted_pairs.append((centers[check_node_index],centers[other_index],self.dis(centers[check_node_index],centers[other_index])))
-
-
-    def create_visibility_graph(self, centers):
-
-        for c in centers:
-            if c is not None:
-                self.samples.append(c)
-
-        points = np.array(self.samples)
-
-        kdtree = spatial.KDTree(points)
-        pairs_initial = kdtree.query_pairs(math.sqrt(self.size_row**2+self.size_col**2))
-        pairs = []
-
-        for (i, j) in pairs_initial:
-            p1_i = self.samples[i]
-            p2_i = self.samples[j]
-            if self.check_collision(p1_i, p2_i):
-                pairs.append((i, j, self.dis(p1_i, p2_i)))
-
-        points_id = range(0, len(points))
-        self.graph.add_nodes_from(points_id)
-        self.graph.add_weighted_edges_from(pairs)
-
-
-    def clear_lines_from_map(self, origional_map_array):
-        # map = self.map_array
-        # for r in range(self.size_row):
-        #     for c in range(self.size_col):
-        #         if map[r,c] == 0.5:
-        #             map[r,c] = 1.0
-        #
-        # self.map_array = map
-
-        self.map_array = origional_map_array
-
 
     def is_vertex(self, node, min_dimension, max_dimension_row, max_dimension_col):
 
@@ -638,7 +494,6 @@ class TrapezoidalDecomposition:
                 return False
         else:
             return False
-
 
     def four_connected(self, node, visited, min_dimension, max_dimension_row, max_dimension_col, queue, grid, parent_dict):
 

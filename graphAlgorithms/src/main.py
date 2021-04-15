@@ -3,12 +3,13 @@
 import os.path
 from PIL import Image
 import numpy as np
+import networkx as nx
 import copy
 
 from trapezoidalDecomposition import TrapezoidalDecomposition
+from visibility_map import VisibilityMap
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
-
 
 def load_map(file_path, resolution_scale):
     ''' Load map from an image and return a 2D binary numpy array
@@ -17,7 +18,7 @@ def load_map(file_path, resolution_scale):
     # Load the image with grayscale
     script_dir = os.path.dirname(os.path.abspath(__file__))
     img = Image.open(os.path.join(script_dir, file_path)).convert('L')
-    
+
     # Rescale the image
     size_x, size_y = img.size
     new_x, new_y  = int(size_x*resolution_scale), int(size_y*resolution_scale)
@@ -32,75 +33,90 @@ def load_map(file_path, resolution_scale):
     # Result 2D numpy array
     return map_array
 
-def draw_path(grid, title, lines = list(), vertices = list(), centers = list()):
-    # Visualization of the found path using matplotlib
+# Adds 1 pixel of padding around all obstacles so that all vertices are created at
+#   a free point on the original map
+def pad_map(map):
+
+    # make a copy to store the padded data in
+    padded_map = copy.deepcopy(map)
+
+    # get the map size
+    size_row = map.shape[0]
+    size_col = map.shape[1]
+
+    for r in range(0, size_row):
+        for c in range(0, size_col):
+            for rp in range(-1,2):
+                for cp in range(-1,2):
+                    if (map[r,c] == 1) and ((r+rp > 0) and (c+cp > 0) and (r+rp < size_row) and (c+cp < size_col)):
+                        if map[r+rp, c+cp] == 0:
+                            padded_map[r,c] = 0
+
+    return padded_map
+
+def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), visibility_map=None):
+    
+    # Create plot
     fig, ax = plt.subplots(1)
-    #ax.margins()
+    
     # Draw map
-    #row = len(grid)     # map size
-    #col = len(grid[0])  # map size
-    #for i in range(row):
-    #    for j in range(col):
-    #        if grid[i][j]:
-    #            ax.add_patch(Rectangle((j-0.5, i-0.5),1,1,edgecolor='w',facecolor='w'))  # free space
-    #        else:
-    #            ax.add_patch(Rectangle((j-0.5, i-0.5),1,1,edgecolor='w',facecolor='k'))  # obstacle
     img = 255 * np.dstack((grid, grid, grid))
     ax.imshow(img)
 
-    # Draw path
-    # for x, y in path:
-    #     ax.add_patch(Rectangle((y-0.5, x-0.5),1,1,edgecolor='k',facecolor='b'))          # path
-    # ax.add_patch(Rectangle((start[1]-0.5, start[0]-0.5),1,1,edgecolor='k',facecolor='g'))# start
-    # ax.add_patch(Rectangle((goal[1]-0.5, goal[0]-0.5),1,1,edgecolor='k',facecolor='r'))  # goal
-    # Graph settings
-
+    # Optional draw TD lines
     for line in lines:
         for pt in line:
             x = pt[0]
             y = pt[1]
             ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='b'))
 
-    # for vert in vertices:
-    #     x = vert[0]
-    #     y = vert[1]
-    #     ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='r'))
+    # Optional draw TD vertices
+    for vert in vertices:
+        x = vert[0]
+        y = vert[1]
+        ax.plot(y, x, markersize=10, marker='+', color='g')
+        #ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='g'))
 
+    # Optional draw TD centers
     for cent in centers:
         if cent is not None:
             x = cent[0]
             y = cent[1]
             ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='r'))
 
+    # Optional draw visibility map
+    if visibility_map is not None:
+        node_pos = np.array(visibility_map.nodes)[:, [1, 0]]
+        pos = dict( zip( range( len(visibility_map.nodes) ), node_pos) )
+        nx.draw(visibility_map.graph, pos, node_size=3, node_color='y', edge_color='y', ax=ax)
+
+    # Show plot
     plt.title(title)
     plt.axis('scaled')
-    #plt.gca().invert_yaxis()
     plt.show()
 
-
-def add_in_lines(map_array, lines):
-    for line in lines:
-        for pt in line:
-            x = pt[0]
-            y = pt[1]
-            map_array[x,y] = 0.5
-
-    return map_array
-
 if __name__ == "__main__":
+
     # Load the map
-    #start = (200, 75)
-    #goal  = (30, 250)
-    map_array = load_map("HospitalMapCleaned_filledin_cropped.png", 0.3)
-    origional_map_array = copy.deepcopy(map_array)
-    draw_path(map_array,"Hospital Array")
+    original_map = load_map("HospitalMapCleaned_filledin_cropped.png", 0.5)
+    
+    # Display the initial map
+    draw_path(original_map,"2D Hospital Map")
 
-    trap_decomp_graph = TrapezoidalDecomposition(map_array)
-    vertices, line_lists_for_boundaries = trap_decomp_graph.create_trapezoids() # trap_decomp_graph = TrapezoidalDecomposition(map_array)
-    map_array_updated = add_in_lines(map_array, line_lists_for_boundaries)
-    centers = trap_decomp_graph.find_centers(map_array_updated)
+    # Add padding to the map
+    padded_map = pad_map(original_map)
 
-    draw_path(origional_map_array,"Hospital Array",line_lists_for_boundaries, vertices, centers)
-    trap_decomp_graph.clear_lines_from_map(origional_map_array)
-    trap_decomp_graph.create_visibility_graph(centers)
-    trap_decomp_graph.draw_map()
+    # Display the padded map
+    draw_path(padded_map,"Padded 2D Hospital Map")
+
+    # Run the trapeziodal decomposition algorithm
+    td = TrapezoidalDecomposition(padded_map)
+    centers, vertices = td.find_centers()
+
+    # Display the TD centers and vertices
+    draw_path(original_map, "Trapezoidal Decomposition Centers", vertices=vertices, centers=centers)
+
+    # Create the visibility graph
+    nodes = centers + vertices
+    vm = VisibilityMap(original_map, nodes)
+    draw_path(original_map, "Visibility Map", visibility_map=vm)
