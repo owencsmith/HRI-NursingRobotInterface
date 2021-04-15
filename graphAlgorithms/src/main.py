@@ -17,6 +17,7 @@ def load_map(file_path, resolution_scale):
     # Load the image with grayscale
     script_dir = os.path.dirname(os.path.abspath(__file__))
     img = Image.open(os.path.join(script_dir, file_path)).convert('L')
+    
     # Rescale the image
     size_x, size_y = img.size
     new_x, new_y  = int(size_x*resolution_scale), int(size_y*resolution_scale)
@@ -34,16 +35,18 @@ def load_map(file_path, resolution_scale):
 def draw_path(grid, title, lines = list(), vertices = list(), centers = list()):
     # Visualization of the found path using matplotlib
     fig, ax = plt.subplots(1)
-    ax.margins()
+    #ax.margins()
     # Draw map
-    row = len(grid)     # map size
-    col = len(grid[0])  # map size
-    for i in range(row):
-        for j in range(col):
-            if grid[i][j]:
-                ax.add_patch(Rectangle((j-0.5, i-0.5),1,1,edgecolor='w',facecolor='w'))  # free space
-            else:
-                ax.add_patch(Rectangle((j-0.5, i-0.5),1,1,edgecolor='w',facecolor='k'))  # obstacle
+    #row = len(grid)     # map size
+    #col = len(grid[0])  # map size
+    #for i in range(row):
+    #    for j in range(col):
+    #        if grid[i][j]:
+    #            ax.add_patch(Rectangle((j-0.5, i-0.5),1,1,edgecolor='w',facecolor='w'))  # free space
+    #        else:
+    #            ax.add_patch(Rectangle((j-0.5, i-0.5),1,1,edgecolor='w',facecolor='k'))  # obstacle
+    img = 255 * np.dstack((grid, grid, grid))
+    ax.imshow(img)
 
     # Draw path
     # for x, y in path:
@@ -71,7 +74,7 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list()):
 
     plt.title(title)
     plt.axis('scaled')
-    plt.gca().invert_yaxis()
+    #plt.gca().invert_yaxis()
     plt.show()
 
 
@@ -86,8 +89,8 @@ def add_in_lines(map_array, lines):
 
 if __name__ == "__main__":
     # Load the map
-    start = (200, 75)
-    goal  = (30, 250)
+    #start = (200, 75)
+    #goal  = (30, 250)
     map_array = load_map("HospitalMapCleaned_filledin_cropped.png", 0.3)
     origional_map_array = copy.deepcopy(map_array)
     draw_path(map_array,"Hospital Array")
@@ -96,6 +99,7 @@ if __name__ == "__main__":
     vertices, line_lists_for_boundaries = trap_decomp_graph.create_trapezoids() # trap_decomp_graph = TrapezoidalDecomposition(map_array)
     map_array_updated = add_in_lines(map_array, line_lists_for_boundaries)
     centers = trap_decomp_graph.find_centers(map_array_updated)
+
     draw_path(origional_map_array,"Hospital Array",line_lists_for_boundaries, vertices, centers)
     trap_decomp_graph.clear_lines_from_map(origional_map_array)
     trap_decomp_graph.create_visibility_graph(centers)
