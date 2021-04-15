@@ -40,6 +40,7 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list()):
                 ax.add_patch(Rectangle((j-0.5, i-0.5),1,1,edgecolor='w',facecolor='w'))  # free space
             else:
                 ax.add_patch(Rectangle((j-0.5, i-0.5),1,1,edgecolor='w',facecolor='k'))  # obstacle
+
     # Draw path
     # for x, y in path:
     #     ax.add_patch(Rectangle((y-0.5, x-0.5),1,1,edgecolor='k',facecolor='b'))          # path
@@ -84,7 +85,6 @@ if __name__ == "__main__":
     start = (200, 75)
     goal  = (30, 250)
     map_array = load_map("HospitalMapCleaned_filledin_cropped.png", 0.3)
-    # map_array = load_map("test_map_simple.png", 0.1)
     draw_path(map_array,"Hospital Array")
 
     trap_decomp_graph = TrapezoidalDecomposition(map_array)
@@ -92,22 +92,3 @@ if __name__ == "__main__":
     map_array_updated = add_in_lines(map_array, line_lists_for_boundaries)
     centers = trap_decomp_graph.find_centers(map_array_updated)
     draw_path(map_array,"Hospital Array",line_lists_for_boundaries, vertices, centers)
-
-
-    # # Planning class
-    # PRM_planner = PRM(map_array)
-    # RRT_planner = RRT(map_array, start, goal)
-    #
-    # # Search with PRM
-    # PRM_planner.sample(n_pts=1000, sampling_method="uniform")
-    # PRM_planner.search(start, goal)
-    # PRM_planner.sample(n_pts=1000, sampling_method="random")
-    # PRM_planner.search(start, goal)
-    # PRM_planner.sample(n_pts=2000, sampling_method="gaussian")
-    # PRM_planner.search(start, goal)
-    # PRM_planner.sample(n_pts=20000, sampling_method="bridge")
-    # PRM_planner.search(start, goal)
-    #
-    # # Search with RRT and RRT*
-    # RRT_planner.RRT(n_pts=1000)
-    # RRT_planner.RRT_star(n_pts=2000)
