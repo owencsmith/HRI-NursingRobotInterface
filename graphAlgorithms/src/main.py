@@ -175,6 +175,9 @@ class SearchCoordinator:
 
         guard.items_to_search_for = []
         guard.being_searched = False
+
+    def reassign_guard(self, guard):
+        guard.being_searched = False
         
 
 '''
@@ -204,6 +207,11 @@ if __name__ == "__main__":
     print("\nItems for robot2 to search for at guard %s" %(str(g2.position)))
     print(g2.items_to_search_for)
 
+    # Robot3 gets a guard to search
+    g3 = sc.get_guard_to_search((50,100)) #robots started at the same spot
+    print("\nItems for robot3 to search for at guard %s" %(str(g3.position)))
+    print(g3.items_to_search_for)
+
     # Robot1 finds nothing
     sc.mark_guard_searched(g1)
     print("\nItems for to search for at guard %s" %(str(g1.position)))
@@ -215,3 +223,8 @@ if __name__ == "__main__":
     print(sc.search_list)
     print("Items for to search for at guard %s" %(str(g2.position)))
     print(g2.items_to_search_for)
+
+    # Robot3 needs to go recharge and can't keep searching
+    sc.reassign_guard(g3)
+    print("\nDoes guard3 need to be searched still:")
+    print(g3.needs_searching())
