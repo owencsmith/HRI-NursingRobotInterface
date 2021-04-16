@@ -11,6 +11,10 @@ from visibility_map import VisibilityMap
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 
+'''
+Miscelaneous Helpers
+'''
+
 def load_map(file_path, resolution_scale):
     ''' Load map from an image and return a 2D binary numpy array
         where 0 represents obstacles and 1 represents free space
@@ -95,48 +99,119 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
     plt.axis('scaled')
     plt.show()
 
+'''
+Guard Class
+'''
+
+class Guard:
+    def __init__(self, position):
+        self.position = position
+        self.items_to_search_for = []
+        self.being_searched = False
+
+    def needs_searching(self):
+        if ((len(self.items_to_search_for) > 0) and (not self.being_searched)):
+            return True
+        return False
+
+    def get_distance(self, robot_pos):
+        '''
+        return:
+            euclidean distance between two points
+        '''
+        #TODO: this doesn't take into account any obstacles
+        return np.sqrt(np.power(self.position[0]-robot_pos[0],2)+np.power(self.position[1]-robot_pos[1],2))
+
+'''
+Search Coordinator Class
+'''
+
+class SearchCoordinator:
+    def __init__(self, map_image, map_scale=0.3):
+        self.original_map = load_map(map_image , map_scale)
+        self.padded_map = pad_map(self.original_map)
+
+        self.td = TrapezoidalDecomposition(self.padded_map)
+        
+        self.centers = self.td.find_centers()
+
+        # Create list of guard objects
+        self.guard_list = []
+        for c in self.centers:
+            self.guard_list.append(Guard(c))
+
+        self.search_list = []
+
+    def draw_guards(self):
+        draw_path(self.original_map, "Trapezoidal Decomposition Centers", centers=self.centers)
+
+    def start_search(self, item_id):
+        if item_id not in self.search_list:
+            self.search_list.append(item_id)
+            for g in self.guard_list:
+                g.items_to_search_for.append(item_id)
+        else:
+            print("item \"%s\" already being searched for, not adding again" %(item_id))
+
+    #return the guard object to search
+    def get_guard_to_search(self, robot_pos):
+        closest_guard = None
+        shortest_dist = float('inf')
+        for g in self.guard_list:
+            d = g.get_distance(robot_pos)
+            if ((d < shortest_dist) and (g.needs_searching())):
+                shortest_dist = d
+                closest_guard = g
+
+        closest_guard.being_searched = True
+        return closest_guard
+
+    def mark_guard_searched(self, guard, items_found=[]):
+        for item in items_found:
+            self.search_list.remove(item)
+            for g in self.guard_list:
+                if item in g.items_to_search_for:
+                    g.items_to_search_for.remove(item)
+
+        guard.items_to_search_for = []
+        guard.being_searched = False
+        
+
+'''
+MAIN
+'''
+
 if __name__ == "__main__":
 
-    '''
-    Map Generation
-    '''
+    sc = SearchCoordinator("HospitalMapCleaned_filledin_cropped_noholes.png")
+    #sc.draw_guards()
 
-    # Load the map
-    original_map = load_map("HospitalMapCleaned_filledin_cropped_noholes.png", 0.3)
-    
-    # Display the initial map
-    #draw_path(original_map,"2D Hospital Map")
+    # Start search for scissors
+    sc.start_search("scissors")
+    sc.start_search("advil")
+    sc.start_search("bandages")
+    sc.start_search("advil")
 
-    # Add padding to the map
-    padded_map = pad_map(original_map)
+    print(sc.search_list)
 
-    # Display the padded map
-    #draw_path(padded_map,"Padded 2D Hospital Map")
+    # Robot1 gets a guard to search
+    g1 = sc.get_guard_to_search((50,100))
+    print("\nItems for robot1 to search for at guard %s" %(str(g1.position)))
+    print(g1.items_to_search_for)
 
-    '''
-    Trapezoidal Decomposition and Guard Placement
-    '''
+    # Robot2 gets a guard to search
+    g2 = sc.get_guard_to_search((50,100)) #robots started at the same spot
+    print("\nItems for robot2 to search for at guard %s" %(str(g2.position)))
+    print(g2.items_to_search_for)
 
-    # Run the trapeziodal decomposition algorithm
-    td = TrapezoidalDecomposition(padded_map)
-    centers, vertices = td.find_centers()
+    # Robot1 finds nothing
+    sc.mark_guard_searched(g1)
+    print("\nItems for to search for at guard %s" %(str(g1.position)))
+    print(g1.items_to_search_for)
 
-    # Display the TD centers and vertices
-    draw_path(original_map, "Trapezoidal Decomposition Centers", vertices=vertices, centers=centers)
-
-    '''
-    Create the visibility graph
-    '''
-
-    # try using just the centers and see if the graph is fully connected
-    vm = VisibilityMap(original_map, centers) 
-    if nx.number_connected_components(vm.graph) > 1:
-        # there are disconnected sections, add the vertices as nodes
-        print("There are %d sections of the graph, adding vertices" %(nx.number_connected_components(vm.graph)))
-        vm = VisibilityMap(original_map, centers + vertices)
-    if nx.number_connected_components(vm.graph) > 1:
-        # there are still disconnected sections, exiting
-        print("There are now %d sections of the graph, exiting" %(nx.number_connected_components(vm.graph)))
-        raise NotImplementedError("There are still disconnected sections of the visibility map")
-
-    draw_path(original_map, "Visibility Map", visibility_map=vm)
+    # Robot2 finds scissors
+    sc.mark_guard_searched(g2, ["scissors"])
+    print("\nSearch List")
+    print(sc.search_list)
+    print("Items for to search for at guard %s" %(str(g2.position)))
+    print(g2.items_to_search_for)
