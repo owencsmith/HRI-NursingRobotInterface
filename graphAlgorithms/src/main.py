@@ -97,17 +97,25 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
 
 if __name__ == "__main__":
 
+    '''
+    Map Generation
+    '''
+
     # Load the map
-    original_map = load_map("HospitalMapCleaned_filledin_cropped.png", 0.5)
+    original_map = load_map("HospitalMapCleaned_filledin_cropped_noholes.png", 0.3)
     
     # Display the initial map
-    draw_path(original_map,"2D Hospital Map")
+    #draw_path(original_map,"2D Hospital Map")
 
     # Add padding to the map
     padded_map = pad_map(original_map)
 
     # Display the padded map
-    draw_path(padded_map,"Padded 2D Hospital Map")
+    #draw_path(padded_map,"Padded 2D Hospital Map")
+
+    '''
+    Trapezoidal Decomposition and Guard Placement
+    '''
 
     # Run the trapeziodal decomposition algorithm
     td = TrapezoidalDecomposition(padded_map)
@@ -116,7 +124,19 @@ if __name__ == "__main__":
     # Display the TD centers and vertices
     draw_path(original_map, "Trapezoidal Decomposition Centers", vertices=vertices, centers=centers)
 
-    # Create the visibility graph
-    nodes = centers + vertices
-    vm = VisibilityMap(original_map, nodes)
+    '''
+    Create the visibility graph
+    '''
+
+    # try using just the centers and see if the graph is fully connected
+    vm = VisibilityMap(original_map, centers) 
+    if nx.number_connected_components(vm.graph) > 1:
+        # there are disconnected sections, add the vertices as nodes
+        print("There are %d sections of the graph, adding vertices" %(nx.number_connected_components(vm.graph)))
+        vm = VisibilityMap(original_map, centers + vertices)
+    if nx.number_connected_components(vm.graph) > 1:
+        # there are still disconnected sections, exiting
+        print("There are now %d sections of the graph, exiting" %(nx.number_connected_components(vm.graph)))
+        raise NotImplementedError("There are still disconnected sections of the visibility map")
+
     draw_path(original_map, "Visibility Map", visibility_map=vm)
