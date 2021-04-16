@@ -14,7 +14,6 @@ class TrapezoidalDecomposition:
 
     def create_trapezoids(self):
 
-        obstacles_dict = dict()
         line_list_for_boundaries = list()
         vertices = list()
 
