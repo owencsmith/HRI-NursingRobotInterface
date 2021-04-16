@@ -78,7 +78,7 @@ class TrapezoidalDecomposition:
                         centers.append((int(center[0]),int(center[1])))
 
         self.centers = centers
-        return self.centers, self.vertices
+        return self.centers
 
     def iterative_bfs(self, grid, queue, visited, min_dimension, max_dimension_row,
                       max_dimension_col):
