@@ -27,15 +27,15 @@ class VisibilityMap:
 
 
     def dist(self, point1, point2):
-            '''Calculate the euclidean distance between two points
-            arguments:
-                p1 - point 1, [row, col]
-                p2 - point 2, [row, col]
-            return:
-                euclidean distance between two points
-            '''
-            
-            return np.sqrt(np.power(point1[0]-point2[0],2)+np.power(point1[1]-point2[1],2))
+        '''Calculate the euclidean distance between two points
+        arguments:
+            p1 - point 1, [row, col]
+            p2 - point 2, [row, col]
+        return:
+            euclidean distance between two points
+        '''
+        
+        return np.sqrt(np.power(point1[0]-point2[0],2)+np.power(point1[1]-point2[1],2))
 
     def check_collision(self, p1, p2):
         '''Check if the path between two points collide with obstacles
