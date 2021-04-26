@@ -16,8 +16,9 @@ import time
 import math
 from std_msgs.msg import *
 from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
-from middleman.srv import TaskString, TaskStringResponse
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Point32
+from geometry_msgs.msg import Polygon as RosPolygon
+from middleman.srv import TaskString, TaskStringResponse, PolygonList, PolygonListResponse
 from sensor_msgs.msg import Image
 
 rospack = rospkg.RosPack()
@@ -25,6 +26,19 @@ designerFile = rospack.get_path('supervisorUI') + "/src/SupervisorUI.ui"
 map = rospack.get_path('supervisorUI') + "/src/Maps/Hospital.json"
 trashIcon = rospack.get_path('supervisorUI') + "/src/trashCanIcon.jpg"
 cameraIcon = rospack.get_path('supervisorUI') + "/src/camera-icon.png"
+
+
+def QPoint_to_Point32(qpt):
+    """
+    Convert from a QT QPoint to a ROS Point32
+    :param qpt: QT QPoint
+    :return: pt: ROS Point32
+    """
+    pt = Point32()
+    pt.x = round(qpt.x() / 100, 3)
+    pt.y = -round(qpt.y() / 100, 3)
+    pt.z = 0
+    return pt
 
 
 class SupervisorUI(QtWidgets.QMainWindow):
@@ -148,6 +162,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
         self.SideMenuShowing = False
         self.SetUpTable()
+
+        self.sketchChanged = False  # this will get set to true whenever edit sketch is turned off
+        self.sketchObstacleServer = rospy.Service('/supervisor/sketchObstacles', PolygonList, self.sendSketchObstacles)
+
         # New supervisor message for middleman
         self.newSupervisorIDPublisher = rospy.Publisher('/supervisor/new_supervisor_ui', String, queue_size=10)
 
@@ -156,8 +174,6 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.heartBeatPublisher = rospy.Publisher('/' + id + '/heartbeat', String, queue_size=10)
         rospy.sleep(1)
         self.newSupervisorIDPublisher.publish(id)
-
-
 
     def sendHeartBeat(self, data):
         self.heartBeatPublisher.publish("lubdub")
@@ -379,6 +395,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
     def sketchModeToggleClickedCallback(self):
         # Toggle Sketch mode on/off
         self.sketchMode = not self.sketchMode
+        self.sketchChanged = not self.sketchMode  # Always opposite sketchMode
 
         if self.sketchMode:
             button_text = 'Save Zones'
@@ -388,6 +405,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         else:
             button_text = 'Edit Zones'
             self.SketchToggleButton.setText(button_text)
+
             for sketch_buttons in self.sketchButtonList:
                 sketch_buttons.setVisible(False)
 
@@ -530,6 +548,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     if groups.isUnderMouse():
                         # if it does then remove it from the scene
                         self.scene.removeItem(groups)
+                        self.sketchItems.remove(groups)
 
     def mapMouseReleaseEventHandler(self, event):
         if self.sketchMode:
@@ -939,6 +958,42 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.TaskSwitchOKBTN.move(TaskFrameWidth * 0.9, 3)
         self.TaskSwitchInfo.resize(TaskFrameWidth * 0.9 - 3, TaskFrameHeight * 0.2 - 3)
         self.TaskSwitchInfo.move(3, 3)
+
+    def sendSketchObstacles(self, req):
+        updatedSinceLastRequest = int(False)
+        obstacles = []
+        if self.sketchChanged:
+            updatedSinceLastRequest = int(True)
+            for item in self.sketchItems:
+                print(isinstance(item, QGraphicsPolygonItem))
+                if isinstance(item, QGraphicsPolygonItem):
+                    p = RosPolygon()
+                    # These points are in the scene reference frame
+                    gotta_get_them_points = item.polygon()
+                    for i in range(gotta_get_them_points.size()):
+                        qpoint = gotta_get_them_points[i]
+                        pt = self.QPoint_to_Point32(qpoint)
+                        p.points.append(pt)
+                    obstacles.append(p)
+                elif isinstance(item, QGraphicsRectItem):
+                    p = RosPolygon()
+                    rect = item.rect()
+                    # These points are in the scene reference frame
+                    tl = rect.topLeft()
+                    tr = rect.topRight()
+                    bl = rect.bottomLeft()
+                    br = rect.bottomRight()
+                    gotta_get_them_points = [tl, tr, br, bl, tl]
+                    for i in range(5):
+                        qpoint = gotta_get_them_points[i]
+                        pt = self.QPoint_to_Point32(qpoint)
+                        p.points.append(pt)
+                    obstacles.append(p)
+            # print("sso")
+            self.sketchChanged = False
+        num_obstacles = len(obstacles)
+
+        return PolygonListResponse(obstacles, num_obstacles, updatedSinceLastRequest)
 
 
 class SideMenuThread(QThread):

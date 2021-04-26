@@ -16,10 +16,10 @@ class Operator:
         self.TellOperatorThatRobotCameraIsAvailable = rospy.Publisher('/' + self.operatorID + '/robotForExtraCamera', String, queue_size=10)
 
         # Set and check heartbeat
-        self.checkHeartBeatTimer = rospy.Timer(rospy.Duration(5), self.checkHeartBeat)
+        self.checkHeartBeatTimer = rospy.Timer(rospy.Duration(10), self.checkHeartBeat)
         self.setHeartBeatSubscriber = rospy.Subscriber("/" + self.operatorID + "/heartbeat", String, self.setHeartBeat)
 
-        # Tell the middleman to kill me after 2.5 seconds of no heartbeat. Operator publishes its own ID onto /operator/seppuku
+        # Tell the middleman to kill me after 10 seconds of no heartbeat. Operator publishes its own ID onto /operator/seppuku
         self.seppukuPublisher = rospy.Publisher('/operator/seppuku', String, queue_size=10)
         rospy.sleep(1)
         pass

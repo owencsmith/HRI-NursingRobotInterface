@@ -1,0 +1,5 @@
+string req
+---
+geometry_msgs/Polygon[] obstacles
+int32 num_obstacles
+int32 updatedSinceLastRequest

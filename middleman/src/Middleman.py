@@ -4,13 +4,18 @@ import time
 import rospy
 from std_msgs.msg import *
 from middleman.msg import Robot, RobotArr, TaskMsg, TaskMsgArr
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, Polygon, Point32, Pose
+from nav_msgs.msg import OccupancyGrid
+from map_msgs.msg import OccupancyGridUpdate
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
-from middleman.srv import TaskString, TaskStringResponse
+from middleman.srv import TaskString, TaskStringResponse, PolygonList, PolygonListResponse
 from Task import *
 from Operator import *
 from Supervisor import *
 import numpy as np
+from skimage.draw import polygon
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 
 # Todo: Change initialization of supervisor and operator publisher & subscriber
@@ -34,6 +39,25 @@ import numpy as np
 
 # Todo: Need a priority queue, active task list for every supervisor - maybe we do move everything into a supervisor
 #  object. Still dont pass the middleman into it if possible
+
+def RMto2D(map_list, width, height):
+    map_2D = np.reshape(map_list, (width, height))
+
+    return map_2D
+
+def TwoDtoRM(map_2D):
+    """
+    Converts from a 2D map to a flattened row-major list
+    :param map_2D:
+    :return:
+    """
+    map_2D = np.array(map_2D)
+    shape_of = np.shape(map_2D)
+    width = shape_of[0]
+    height = shape_of[1]
+    rowmajor = map_2D.flatten()
+    return rowmajor, width, height
+
 
 class Middleman():
     def __init__(self):
@@ -81,6 +105,10 @@ class Middleman():
         self.robotsForOperator = []
         self.operatorIsBusy = False
 
+        self.map = OccupancyGrid()
+        self.occupancy_grid = None
+        self.map_origin = Pose
+
         self.rate = rospy.Rate(5)
 
         # Task Strings: 'task_name robot_name X Y [vars ...]'
@@ -98,6 +126,8 @@ class Middleman():
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
 
+        # subscribe to gazebo map
+        rospy.Subscriber("/map", OccupancyGrid, self.getBaseMap)
         rospy.sleep(1)
 
         # publishers
@@ -105,10 +135,15 @@ class Middleman():
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size=10)
         # self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
+
+        self.updatedMapPublisher = rospy.Publisher('/map_updates', OccupancyGridUpdate, queue_size=10)
         rospy.sleep(1)
 
         # servers
         self.taskCodeServer = rospy.Service('/supervisor/taskCodes', TaskString, self.sendTaskCodesToSupervisor)
+
+        # service proxy
+        self.getSketchedObstacles = rospy.ServiceProxy('/supervisor/sketchObstacles', PolygonList)
 
     # check data length >= 4
     # process task determines which queue to put the task in
@@ -296,7 +331,6 @@ class Middleman():
         # add 90 deg for offset with UI. Our Z is out of the page, 0 is pointing left
         q_orientation = quaternion_from_euler(0, 0, yaw)
 
-        # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.x = q_orientation[0]
         poseStamped.pose.orientation.y = q_orientation[1]
         poseStamped.pose.orientation.w = q_orientation[2]
@@ -624,6 +658,9 @@ class Middleman():
                 supervisor.taskPriorityQueue.append(task)
 
     def setRobotToIdle(self, robot):
+        # check for if not assigned to a supervisor
+        if robot.supervisorID == '':
+            return  # just return because the robot should already be Idle
         info_str = robot.supervisorID + ' ' + 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
         self.processTask(info_str)
 
@@ -776,6 +813,96 @@ class Middleman():
 
             pass
 
+    def getBaseMap(self, map):
+        # convert from row-major to 2D
+        map_width = map.info.width
+        map_height = map.info.height
+        # print(map_width)
+        # print(map_height)
+        self.map = map
+        self.occupancy_grid = RMto2D(map.data, map_width, map_height)
+        self.map_origin = map.info.origin
+        # print(np.array(self.occupancy_grid).shape)
+        # binary_grid = np.where(self.occupancy_grid > 50, 0, 1)
+        # plt.imsave('HospitalMap.png', np.array(binary_grid), cmap='gray')
+        #save pose of origin of map
+        print("Got the Map")
+        print(map.info)
+
+    def convertToMapCoordinates(self, obstacles):
+        # obstacles will be in real world coordinates
+        # the default map origin for the small hospital world, (0,0), is at x=-15, y=-15, z=0 in the real world
+        # the map's origin gets saved to self.map_origin in the getBaseMap function as a geometry_msg/Pose
+        """
+        Converts from real world coordinates to index coordinates for the 2D map
+        :param obstacles: A list of geometry_msg/Polygon in real world coordinates
+        :return: A list of 2D points
+        """
+        print(obstacles)
+        transformed_obstacles = []
+        for ob in obstacles:
+            poly = []
+            for pt in ob.points:
+                transformed_pt = []
+                res = self.map.info.resolution
+                hi_x = abs(self.map_origin.position.x)
+                hi_y = abs(self.map_origin.position.y)
+
+                x = (np.interp(pt.x, [-hi_x, hi_x], [0, (hi_x*2)]))
+                y = (np.interp(pt.y, [-hi_y, hi_y], [0, (hi_y*2)]))
+                transformed_pt.append(int(x / res))
+                transformed_pt.append(int(y / res))
+                poly.append(transformed_pt)
+            transformed_obstacles.append(poly)
+        print(transformed_obstacles)
+        return transformed_obstacles
+
+    def augmentMap(self, obstacles):
+        """
+        Adds filled obstacles to map as polygons
+        :param obstacles: List of polygons (polygon is list of points [point is x,y])
+        :return: the augmented map
+        """
+
+        augmented_map = np.copy(self.occupancy_grid)
+
+        # skimage.draw polygon needs row & col parallel lists
+        for poly in obstacles:
+            row = []
+            col = []
+            for pt in poly:
+                col.append(pt[0])
+                row.append(pt[1])
+                r_idx, c_idx = polygon(row, col)
+                augmented_map[r_idx, c_idx] = 100  # this is where the probability will be parameterized by risk
+
+        # binary_grid = np.where(augmented_map > 50, 0, 1)
+        # plt.imsave('AddObstacleTest.png', np.array(binary_grid), cmap='gray')
+        return augmented_map
+
+    def sendMap(self):
+        # service proxy
+        rospy.wait_for_service('/supervisor/sketchObstacles')
+        obstacles_info = self.getSketchedObstacles("Gimme gimme")  # the string sent here doesn't matter at the moment
+        # print(obstacles_info)
+        if obstacles_info.updatedSinceLastRequest == 1:
+            print("hi1")
+            if self.occupancy_grid is not None:
+                print("hi2")
+        if obstacles_info.updatedSinceLastRequest == 1 and self.occupancy_grid is not None:
+            #print(obstacles_info)
+            transformed_obstacles = self.convertToMapCoordinates(obstacles_info.obstacles)
+            aug_map = self.augmentMap(transformed_obstacles)
+            flat_map, w, h = TwoDtoRM(aug_map)
+            ogu = OccupancyGridUpdate()
+            ogu.header.stamp = rospy.Time.now()
+            ogu.x = 0  #int(self.map.info.origin.position.x)
+            ogu.y = 0  #int(self.map.info.origin.position.y)
+            ogu.data = flat_map
+            ogu.width = w
+            ogu.height = h
+            self.updatedMapPublisher.publish(ogu)
+
 
 middleman = Middleman()
 while not rospy.is_shutdown():
@@ -785,4 +912,5 @@ while not rospy.is_shutdown():
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
     middleman.checkNavStatus()
+    middleman.sendMap()
     middleman.rate.sleep()

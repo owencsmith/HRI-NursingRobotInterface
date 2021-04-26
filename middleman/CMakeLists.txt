@@ -12,6 +12,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   std_msgs
   geometry_msgs
+  nav_msgs
+  map_msgs
   message_generation
 )
 
@@ -61,6 +63,7 @@ add_message_files(
 add_service_files(
   FILES
   TaskString.srv
+  PolygonList.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -75,6 +78,8 @@ generate_messages(
    DEPENDENCIES
    std_msgs
    geometry_msgs
+   nav_msgs
+   map_msgs
  )
 
 ################################################
