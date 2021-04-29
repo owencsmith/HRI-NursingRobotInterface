@@ -782,7 +782,7 @@ class Middleman():
 
             pass
 
-    def guard_searching(self, msg):
+    def guard_searching(self):
         if len(self.activeRobotDictionary) > 0:
             sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
             rospy.sleep(10)
@@ -937,5 +937,5 @@ while not rospy.is_shutdown():
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
     middleman.checkNavStatus()
-    # middleman.guard_searching()
+    middleman.guard_searching()
     middleman.rate.sleep()
