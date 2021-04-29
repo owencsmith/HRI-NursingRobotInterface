@@ -840,11 +840,12 @@ class Middleman():
         # print(map_width)
         # print(trap_graph_width)
         translated_x = (pt[0] - origin_x)/res
-        translated_y = (pt[1] - origin_y)/res
+        translated_y = (-pt[1] - origin_y)/res
         # rospy.logwarn("intermediate point is " + str([translated_x, translated_y]))
         scaled_x = translated_x * (trap_graph_width / map_width)
         scaled_y = translated_y * (trap_graph_height / map_height)
         # rospy.logwarn("scaled point is " + str([scaled_x, scaled_y]))
+        # GUARD IS ROW, COL
         transformed_pt.append(int(scaled_x))
         transformed_pt.append(int(scaled_y))
         rospy.logwarn("transformed point world to guard is: " + str(transformed_pt))
@@ -872,7 +873,6 @@ class Middleman():
 
 
     def transform_map_to_realworld(self, pt, trap_graph_wh):
-
         transformed_pt = []
         res = self.map.info.resolution
         origin_x = self.map.info.origin.position.x
@@ -886,7 +886,7 @@ class Middleman():
         scaled_y = pt[1]*(map_height/trap_graph_height)
 
         transformed_pt.append(scaled_x*res + origin_x)
-        transformed_pt.append(scaled_y*res + origin_y)
+        transformed_pt.append(-(scaled_y*res + origin_y))
         rospy.logwarn("transformed point guard to world is: " + str(transformed_pt))
         # transformed_pt = (0,0)
         return transformed_pt

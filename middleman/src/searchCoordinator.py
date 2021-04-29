@@ -114,8 +114,9 @@ Guard Class
 '''
 
 class Guard:
-    def __init__(self, position):
-        self.position = position
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
         self.items_to_search_for = []
         self.being_searched = False
 
@@ -124,13 +125,13 @@ class Guard:
             return True
         return False
 
-    def get_distance(self, robot_pos):
+    def get_distance(self, robot_x, robot_y):
         '''
         return:
             euclidean distance between two points
         '''
         #TODO: this doesn't take into account any obstacles
-        return np.sqrt(np.power(self.position[0]-robot_pos[0],2)+np.power(self.position[1]-robot_pos[1],2))
+        return np.sqrt(np.power(self.x-robot_x,2)+np.power(self.y-robot_y,2))
 
 '''
 Search Coordinator Class
@@ -151,7 +152,7 @@ class SearchCoordinator:
         # Create list of guard objects
         self.guard_list = []
         for c in self.centers:
-            self.guard_list.append(Guard(c))
+            self.guard_list.append(Guard(c[1], c[0]))
 
         self.search_list = []
 
@@ -164,8 +165,8 @@ class SearchCoordinator:
 
     def draw_guards_gone_to(self, guard):
         guards = list()
-        guards.append(guard.position)
-        draw_path(self.original_map, "Guard", guards)
+        guards.append([guard.y, guard.x])
+        draw_path(self.original_map, "Guard", vertices=guards)
 
 
     def start_search(self, item_ids_list):
@@ -179,17 +180,22 @@ class SearchCoordinator:
 
     #return the guard object to search
     def get_guard_to_search(self, robot_pos):
+        """
+        Returns the nearest guard object that still needs to be searched
+        :param robot_pos: an iterable containing [robot_x, robot_y]
+        :return: The guard object, its [x,y] position
+        """
         closest_guard = None
         shortest_dist = float('inf')
         for g in self.guard_list:
-            d = g.get_distance(robot_pos)
+            d = g.get_distance(robot_pos[0], robot_pos[1])
             print("guard: " + str(g) + " need searching? " + str(g.needs_searching()))
             if ((d < shortest_dist) and (g.needs_searching())):
                 shortest_dist = d
                 closest_guard = g
 
         closest_guard.being_searched = True
-        return closest_guard, closest_guard.position #resize_to_orig(self.map_scale, closest_guard.position)
+        return closest_guard, [closest_guard.x,closest_guard.y] #resize_to_orig(self.map_scale, closest_guard.position)
 
     def mark_guard_searched(self, guard, items_found=[]):
         for item in items_found:
