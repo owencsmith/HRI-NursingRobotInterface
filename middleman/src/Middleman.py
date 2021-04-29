@@ -782,47 +782,49 @@ class Middleman():
             pass
 
     def guard_searching(self):
-        sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
-        # sc.draw_guards()
+        if len(self.activeRobotDictionary) > 0:
+            sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
+            # sc.draw_guards()
 
-        # Start search for scissors
-        items_list = ["scissors", "advil", "bandages", "advil"]
+            # Start search for scissors
+            items_list = ["scissors", "advil", "bandages", "advil"]
 
-        sc.start_search(items_list)
-        wh = sc.get_width_and_height()
-        width = wh[0]
-        height = wh[1]
-        rospy.logwarn("graph width: " + str(width))
-        rospy.logwarn("graph height: " + str(height))
-        rospy.logwarn("map width: " + str(self.map.info.width))
-        rospy.logwarn("map height: " + str(self.map.info.height))
-        rospy.logwarn("map resolution: " + str(self.map.info.resolution))
-        hi_x = self.map.info.origin.position.x
-        hi_y = self.map.info.origin.position.y
-        rospy.logwarn("map origin x: " + str(hi_x))
-        rospy.logwarn("map origin y: " + str(hi_y))
+            sc.start_search(items_list)
+            wh = sc.get_width_and_height()
+            width = wh[0]
+            height = wh[1]
+            rospy.logwarn("graph width: " + str(width))
+            rospy.logwarn("graph height: " + str(height))
+            rospy.logwarn("map width: " + str(self.map.info.width))
+            rospy.logwarn("map height: " + str(self.map.info.height))
+            rospy.logwarn("map resolution: " + str(self.map.info.resolution))
+            hi_x = self.map.info.origin.position.x
+            hi_y = self.map.info.origin.position.y
+            rospy.logwarn("map origin x: " + str(hi_x))
+            rospy.logwarn("map origin y: " + str(hi_y))
 
-        guard_list = list()
+            guard_list = list()
 
-        robots = self.activeRobotDictionary.keys()
+            robots = self.activeRobotDictionary.keys()
 
-        # for robot in self.activeRobotDictionary.values():
-        for robotName in robots:
-            robot = self.activeRobotDictionary.get(robotName)
+            # for robot in self.activeRobotDictionary.values():
+            for robotName in robots:
+                robot = self.activeRobotDictionary.get(robotName)
 
-            if robot.currentTaskName == "IDLE":
-                x = robot.pose.pose.pose.position.x
-                y = robot.pose.pose.pose.position.y
+                if robot.currentTaskName == "IDLE":
+                    x = robot.pose.pose.pose.position.x
+                    y = robot.pose.pose.pose.position.y
+                    if x != 0 and y != 0:
 
-                rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
+                        rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
 
-                pt_to_search = self.transform_realworld_to_map((x,y),wh)
+                        pt_to_search = self.transform_realworld_to_map((x,y),wh)
 
-                a_guard, guard_position = sc.get_guard_to_search(pt_to_search)
-                # sc.draw_guards_gone_to(a_guard)
-                rospy.logwarn("guard: " + str(guard_position))
-                map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
-                self.sendRobotToPos(robot, map_pt[0], map_pt[1])
+                        a_guard, guard_position = sc.get_guard_to_search(pt_to_search)
+                        # sc.draw_guards_gone_to(a_guard)
+                        rospy.logwarn("guard: " + str(guard_position))
+                        map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
+                        self.sendRobotToPos(robot, map_pt[0], map_pt[1])
 
 
     def transform_realworld_to_map(self, pt, trap_graph_wh):
@@ -831,18 +833,20 @@ class Middleman():
         res = self.map.info.resolution
         origin_x = self.map.info.origin.position.x
         origin_y = self.map.info.origin.position.y
-        trap_graph_width = trap_graph_wh[0]
-        trap_graph_height = trap_graph_wh[1]
-        map_width = self.map.info.width
-        map_height = self.map.info.height
-
+        trap_graph_width = float(trap_graph_wh[0])
+        trap_graph_height = float(trap_graph_wh[1])
+        map_width = float(self.map.info.width)
+        map_height = float(self.map.info.height)
+        # print(map_width)
+        # print(trap_graph_width)
         translated_x = (pt[0] - origin_x)/res
         translated_y = (pt[1] - origin_y)/res
+        # rospy.logwarn("intermediate point is " + str([translated_x, translated_y]))
         scaled_x = translated_x * (trap_graph_width / map_width)
         scaled_y = translated_y * (trap_graph_height / map_height)
-
-        transformed_pt.append(scaled_x)
-        transformed_pt.append(scaled_y)
+        # rospy.logwarn("scaled point is " + str([scaled_x, scaled_y]))
+        transformed_pt.append(int(scaled_x))
+        transformed_pt.append(int(scaled_y))
         rospy.logwarn("transformed point world to guard is: " + str(transformed_pt))
         # transformed_pt = (0, 0)
         return transformed_pt
@@ -873,10 +877,10 @@ class Middleman():
         res = self.map.info.resolution
         origin_x = self.map.info.origin.position.x
         origin_y = self.map.info.origin.position.y
-        trap_graph_width = trap_graph_wh[0]
-        trap_graph_height = trap_graph_wh[1]
-        map_width = self.map.info.width
-        map_height = self.map.info.height
+        trap_graph_width = float(trap_graph_wh[0])
+        trap_graph_height = float(trap_graph_wh[1])
+        map_width = float(self.map.info.width)
+        map_height = float(self.map.info.height)
 
         scaled_x = pt[0]*(map_width/trap_graph_width)
         scaled_y = pt[1]*(map_height/trap_graph_height)
