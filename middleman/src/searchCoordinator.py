@@ -82,7 +82,7 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
         for pt in line:
             x = pt[0]
             y = pt[1]
-            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='b'))
+            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='b', facecolor='b'))
 
     # Optional draw TD vertices
     for vert in vertices:
@@ -96,7 +96,22 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
         if cent is not None:
             x = cent[0]
             y = cent[1]
-            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='w', facecolor='r'))
+            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='r', facecolor='r'))
+
+    #GRAPH ROBOTS POSITIONS (ex ros output "robot trina2_3 trap graph position is 89, 44" plug in (89 - 0.5, 44 - 0.5) into Rectangle
+    ax.add_patch(Rectangle((89 - 0.5, 44 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+    ax.add_patch(Rectangle((89 - 0.5, 95 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+    ax.add_patch(Rectangle((89 - 0.5, 101 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+
+    #GRAPH THEIR GUARDS (ex ros output is "guard: [88, 91]" plug in (88 - 0.5, 91 - 0.5) into Rectangle
+    ax.add_patch(Rectangle((67 - 0.5, 31 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+    ax.add_patch(Rectangle((61 - 0.5, 31 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+    ax.add_patch(Rectangle((88 - 0.5, 91 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+
+
+
+
+
 
     # Optional draw visibility map
     if visibility_map is not None:

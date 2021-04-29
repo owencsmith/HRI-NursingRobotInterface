@@ -791,17 +791,17 @@ class Middleman():
 
             sc.start_search(items_list)
             wh = sc.get_width_and_height()
-            width = wh[0]
-            height = wh[1]
-            rospy.logwarn("graph width: " + str(width))
-            rospy.logwarn("graph height: " + str(height))
-            rospy.logwarn("map width: " + str(self.map.info.width))
-            rospy.logwarn("map height: " + str(self.map.info.height))
-            rospy.logwarn("map resolution: " + str(self.map.info.resolution))
-            hi_x = self.map.info.origin.position.x
-            hi_y = self.map.info.origin.position.y
-            rospy.logwarn("map origin x: " + str(hi_x))
-            rospy.logwarn("map origin y: " + str(hi_y))
+            # width = wh[0]
+            # height = wh[1]
+            # rospy.logwarn("graph width: " + str(width))
+            # rospy.logwarn("graph height: " + str(height))
+            # rospy.logwarn("map width: " + str(self.map.info.width))
+            # rospy.logwarn("map height: " + str(self.map.info.height))
+            # rospy.logwarn("map resolution: " + str(self.map.info.resolution))
+            # hi_x = self.map.info.origin.position.x
+            # hi_y = self.map.info.origin.position.y
+            # rospy.logwarn("map origin x: " + str(hi_x))
+            # rospy.logwarn("map origin y: " + str(hi_y))
 
             guard_list = list()
 
@@ -820,7 +820,9 @@ class Middleman():
 
                         pt_to_search = self.transform_realworld_to_map((x,y),wh)
 
-                        a_guard, guard_position = sc.get_guard_to_search(pt_to_search)
+                        rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
+
+                        a_guard, guard_position = sc.get_guard_to_search((pt_to_search[1],pt_to_search[0]))
                         # sc.draw_guards_gone_to(a_guard)
                         rospy.logwarn("guard: " + str(guard_position))
                         map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
