@@ -20,12 +20,16 @@ def load_map(file_path, resolution_scale):
         where 0 represents obstacles and 1 represents free space
     '''
     # Load the image with grayscale
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    img = Image.open(os.path.join(script_dir, file_path)).convert('L')
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        print(script_dir)
+        img = Image.open(os.path.join(script_dir, file_path)).convert('L')
+    except:
+        print("Image open failed")
 
     # Rescale the image
     size_x, size_y = img.size
-    new_x, new_y  = int(size_x*resolution_scale), int(size_y*resolution_scale)
+    new_x, new_y = int(size_x*resolution_scale), int(size_y*resolution_scale)
     img = img.resize((new_x, new_y), Image.ANTIALIAS)
 
     map_array = np.asarray(img, dtype='uint8')
@@ -136,7 +140,7 @@ class Guard:
         self.being_searched = False
 
     def needs_searching(self):
-        if ((len(self.items_to_search_for) > 0) and (not self.being_searched)):
+        if (len(self.items_to_search_for) > 0) and (not self.being_searched):
             return True
         return False
 
@@ -146,7 +150,7 @@ class Guard:
             euclidean distance between two points
         '''
         #TODO: this doesn't take into account any obstacles
-        return np.sqrt(np.power(self.x-robot_x,2)+np.power(self.y-robot_y,2))
+        return np.sqrt(np.power(self.x-robot_x, 2)+np.power(self.y-robot_y, 2))
 
 '''
 Search Coordinator Class
@@ -155,7 +159,7 @@ Search Coordinator Class
 class SearchCoordinator:
     def __init__(self, map_image, map_scale=0.3):
         self.map_scale = map_scale
-        self.original_map = load_map(map_image , map_scale)
+        self.original_map = load_map(map_image, map_scale)
         self.padded_map = np.flipud(pad_map(self.original_map))
 
         self.width, self.height = np.shape(self.padded_map)
@@ -163,11 +167,14 @@ class SearchCoordinator:
         self.td = TrapezoidalDecomposition(self.padded_map)
         
         self.centers = self.td.find_centers()
+        print(len(self.centers))
+        print(self.centers[-1])
 
         # Create list of guard objects
         self.guard_list = []
         for c in self.centers:
             self.guard_list.append(Guard(c[1], c[0]))
+        print(len(self.guard_list))
 
         self.search_list = []
 
@@ -183,15 +190,14 @@ class SearchCoordinator:
         guards.append([guard.y, guard.x])
         draw_path(self.original_map, "Guard", vertices=guards)
 
-
     def start_search(self, item_ids_list):
         for item_id in item_ids_list:
             if item_id not in self.search_list:
                 self.search_list.append(item_id)
                 for g in self.guard_list:
                     g.items_to_search_for.append(item_id)
-        else:
-            print("item \"%s\" already being searched for, not adding again" %(item_id))
+            else:
+                print("item \"%s\" already being searched for, not adding again" %(item_id))
 
     #return the guard object to search
     def get_guard_to_search(self, robot_pos):
@@ -205,12 +211,12 @@ class SearchCoordinator:
         for g in self.guard_list:
             d = g.get_distance(robot_pos[0], robot_pos[1])
             print("guard: " + str(g) + " need searching? " + str(g.needs_searching()))
-            if ((d < shortest_dist) and (g.needs_searching())):
+            if (d < shortest_dist) and (g.needs_searching()):
                 shortest_dist = d
                 closest_guard = g
 
         closest_guard.being_searched = True
-        return closest_guard, [closest_guard.x,closest_guard.y] #resize_to_orig(self.map_scale, closest_guard.position)
+        return closest_guard, [closest_guard.x, closest_guard.y] #resize_to_orig(self.map_scale, closest_guard.position)
 
     def mark_guard_searched(self, guard, items_found=[]):
         for item in items_found:
@@ -232,7 +238,7 @@ MAIN
 
 if __name__ == "__main__":
     sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
-    sc.draw_guards()
+    # sc.draw_guards()
 
     # Start search for scissors
     items_list = ["scissors","advil","bandages","advil"]

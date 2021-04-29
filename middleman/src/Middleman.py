@@ -114,6 +114,7 @@ class Middleman():
         self.taskCodeServer = rospy.Service('/supervisor/taskCodes', TaskString, self.sendTaskCodesToSupervisor)
         self.map = OccupancyGrid()
         self.mapSubscriber = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
+        self.collaborativeSearchSubscriber = rospy.Subscriber('/collab', String, self.guard_searching)
 
     # check data length >= 4
     # process task determines which queue to put the task in
@@ -781,15 +782,18 @@ class Middleman():
 
             pass
 
-    def guard_searching(self):
+    def guard_searching(self, msg):
         if len(self.activeRobotDictionary) > 0:
             sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
-            # sc.draw_guards()
+            rospy.sleep(10)
+            #sc.draw_guards()
 
             # Start search for scissors
             items_list = ["scissors", "advil", "bandages", "advil"]
 
             sc.start_search(items_list)
+            for g in sc.guard_list:
+                print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
             wh = sc.get_width_and_height()
             # width = wh[0]
             # height = wh[1]
@@ -933,7 +937,5 @@ while not rospy.is_shutdown():
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
     middleman.checkNavStatus()
-    # if first_time:
-    middleman.guard_searching()
-        # first_time = False
+    # middleman.guard_searching()
     middleman.rate.sleep()
