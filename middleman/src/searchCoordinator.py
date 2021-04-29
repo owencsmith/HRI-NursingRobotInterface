@@ -108,9 +108,9 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
     ax.add_patch(Rectangle((89 - 0.5, 101 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
 
     #GRAPH THEIR GUARDS (ex ros output is "guard: [88, 91]" plug in (88 - 0.5, 91 - 0.5) into Rectangle
-    ax.add_patch(Rectangle((67 - 0.5, 31 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
-    ax.add_patch(Rectangle((61 - 0.5, 31 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
-    ax.add_patch(Rectangle((88 - 0.5, 91 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+    ax.add_patch(Rectangle((87 - 0.5, 44 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+    ax.add_patch(Rectangle((99 - 0.5, 105 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+    ax.add_patch(Rectangle((90 - 0.5, 85 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
 
 
 
@@ -238,7 +238,7 @@ MAIN
 
 if __name__ == "__main__":
     sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
-    # sc.draw_guards()
+    sc.draw_guards()
 
     # Start search for scissors
     items_list = ["scissors","advil","bandages","advil"]

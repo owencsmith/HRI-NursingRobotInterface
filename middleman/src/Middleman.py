@@ -826,7 +826,7 @@ class Middleman():
 
                         rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
-                        a_guard, guard_position = sc.get_guard_to_search((pt_to_search[1],pt_to_search[0]))
+                        a_guard, guard_position = sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
                         # sc.draw_guards_gone_to(a_guard)
                         rospy.logwarn("guard: " + str(guard_position))
                         map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
