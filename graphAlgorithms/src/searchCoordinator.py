@@ -128,12 +128,14 @@ Search Coordinator Class
 
 class SearchCoordinator:
     def __init__(self, map_image, map_scale=0.3):
-        self.original_map = load_map(map_image , map_scale)
-        self.padded_map = pad_map(self.original_map)
+        self.original_map = np.flipud(load_map(map_image , map_scale))
+        self.padded_map = np.flipud(pad_map(self.original_map))
 
         self.td = TrapezoidalDecomposition(self.padded_map)
         
         self.centers = self.td.find_centers()
+
+
 
         # Create list of guard objects
         self.guard_list = []
@@ -145,11 +147,12 @@ class SearchCoordinator:
     def draw_guards(self):
         draw_path(self.original_map, "Trapezoidal Decomposition Centers", centers=self.centers)
 
-    def start_search(self, item_id):
-        if item_id not in self.search_list:
-            self.search_list.append(item_id)
-            for g in self.guard_list:
-                g.items_to_search_for.append(item_id)
+    def start_search(self, item_ids_list):
+        for item_id in item_ids_list:
+            if item_id not in self.search_list:
+                self.search_list.append(item_id)
+                for g in self.guard_list:
+                    g.items_to_search_for.append(item_id)
         else:
             print("item \"%s\" already being searched for, not adding again" %(item_id))
 
@@ -173,7 +176,7 @@ class SearchCoordinator:
                 if item in g.items_to_search_for:
                     g.items_to_search_for.remove(item)
 
-        guard.items_to_search_for = []
+        # guard.items_to_search_for = []
         guard.being_searched = False
 
     def reassign_guard(self, guard):
@@ -186,45 +189,45 @@ MAIN
 
 if __name__ == "__main__":
 
-    sc = SearchCoordinator("HospitalMapCleaned_filledin_cropped_noholes.png")
-    #sc.draw_guards()
+    sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
+    sc.draw_guards()
 
     # Start search for scissors
-    sc.start_search("scissors")
-    sc.start_search("advil")
-    sc.start_search("bandages")
-    sc.start_search("advil")
+    items_list = ["scissors","advil","bandages","advil"]
 
-    print(sc.search_list)
+    sc.start_search(items_list)
 
-    # Robot1 gets a guard to search
-    g1 = sc.get_guard_to_search((50,100))
-    print("\nItems for robot1 to search for at guard %s" %(str(g1.position)))
-    print(g1.items_to_search_for)
+    # while sc.search_list:
 
-    # Robot2 gets a guard to search
-    g2 = sc.get_guard_to_search((50,100)) #robots started at the same spot
-    print("\nItems for robot2 to search for at guard %s" %(str(g2.position)))
-    print(g2.items_to_search_for)
 
-    # Robot3 gets a guard to search
-    g3 = sc.get_guard_to_search((50,100)) #robots started at the same spot
-    print("\nItems for robot3 to search for at guard %s" %(str(g3.position)))
-    print(g3.items_to_search_for)
-
-    # Robot1 finds nothing
-    sc.mark_guard_searched(g1)
-    print("\nItems for to search for at guard %s" %(str(g1.position)))
-    print(g1.items_to_search_for)
-
-    # Robot2 finds scissors
-    sc.mark_guard_searched(g2, ["scissors"])
-    print("\nSearch List")
-    print(sc.search_list)
-    print("Items for to search for at guard %s" %(str(g2.position)))
-    print(g2.items_to_search_for)
-
-    # Robot3 needs to go recharge and can't keep searching
-    sc.reassign_guard(g3)
-    print("\nDoes guard3 need to be searched still:")
-    print(g3.needs_searching())
+    # # Robot1 gets a guard to search
+    # g1 = sc.get_guard_to_search((50,100))
+    # print("\nItems for robot1 to search for at guard %s" %(str(g1.position)))
+    # print(g1.items_to_search_for)
+    #
+    # # Robot2 gets a guard to search
+    # g2 = sc.get_guard_to_search((50,100)) #robots started at the same spot
+    # print("\nItems for robot2 to search for at guard %s" %(str(g2.position)))
+    # print(g2.items_to_search_for)
+    #
+    # # Robot3 gets a guard to search
+    # g3 = sc.get_guard_to_search((50,100)) #robots started at the same spot
+    # print("\nItems for robot3 to search for at guard %s" %(str(g3.position)))
+    # print(g3.items_to_search_for)
+    #
+    # # Robot1 finds nothing
+    # sc.mark_guard_searched(g1)
+    # print("\nItems for to search for at guard %s" %(str(g1.position)))
+    # print(g1.items_to_search_for)
+    #
+    # # Robot2 finds scissors
+    # sc.mark_guard_searched(g2, ["scissors"])
+    # print("\nSearch List")
+    # print(sc.search_list)
+    # print("Items for to search for at guard %s" %(str(g2.position)))
+    # print(g2.items_to_search_for)
+    #
+    # # Robot3 needs to go recharge and can't keep searching
+    # sc.reassign_guard(g3)
+    # print("\nDoes guard3 need to be searched still:")
+    # print(g3.needs_searching())
