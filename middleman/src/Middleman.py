@@ -785,7 +785,7 @@ class Middleman():
     def guard_searching(self):
         if len(self.activeRobotDictionary) > 0:
             sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
-            rospy.sleep(10)
+            # rospy.sleep(10)
             #sc.draw_guards()
 
             # Start search for scissors
