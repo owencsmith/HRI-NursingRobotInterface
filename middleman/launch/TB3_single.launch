@@ -1,0 +1,44 @@
+<launch>
+
+  <!-- Arguments -->
+  <!-- Robot name -->
+  <arg name="robot_name" default="tb3"/>
+  <arg name="prefix" default="$(arg robot_name)/"/>
+  <arg name="blank" default=" "/>
+  <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
+
+  <!-- Gazebo parameters -->
+  <arg name="cyclic_data_publish_rate" default="30"/> <!--Hz-->
+
+  <!-- Initial position in Gazebo -->
+  <arg name="x0" default="1"/>
+  <arg name="y0" default="-1"/>
+  <arg name="z0" default="0"/>
+  <arg name="yaw" default="1.57" />
+
+  <param name="robot_description" command="$(find xacro)/xacro --inorder 
+    $(find turtlebot3_description)/urdf/turtlebot3_$(arg model)_no_prefix.urdf.xacro 
+    robot_name:=$(arg robot_name) prefix:=$(arg prefix)"/>
+
+  <node name="spawn_urdf" pkg="gazebo_ros" type="spawn_model" args="-urdf 
+    -model $(arg robot_name) 
+    -x $(arg x0) 
+    -y $(arg y0) 
+    -z $(arg z0) 
+    -Y $(arg yaw) 
+    -param robot_description 
+    -robot_namespace $(arg robot_name)" />
+
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" respawn="false" output="screen">
+    <param name="publish_frequency" value="25" />
+  </node>
+
+  <!-- Navigation package -->
+  <include file="$(find middleman)/launch/TB3_nav.launch">
+    <arg name="prefix" value="$(arg prefix)"/>
+  </include>
+
+  <!-- Send boot message -->
+  <node name="boot_message" pkg="trina2_control" type="send_boot_message.py" args = "$(arg robot_name)"/>
+
+</launch>

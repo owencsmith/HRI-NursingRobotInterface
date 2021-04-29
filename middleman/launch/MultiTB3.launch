@@ -1,0 +1,108 @@
+<launch>
+  <arg name="model" default="$(env TURTLEBOT3_MODEL)" doc="model type [burger, waffle, waffle_pi]"/>
+  <arg name="first_tb3"  default="tb3_1"/>
+  <arg name="second_tb3" default="tb3_2"/>
+  <arg name="third_tb3"  default="tb3_3"/>
+
+  <arg name="first_tb3_x_pos" default="-7.0"/>
+  <arg name="first_tb3_y_pos" default="-1.0"/>
+  <arg name="first_tb3_z_pos" default=" 0.0"/>
+  <arg name="first_tb3_yaw"   default=" 1.57"/>
+
+  <arg name="second_tb3_x_pos" default=" 7.0"/>
+  <arg name="second_tb3_y_pos" default="-1.0"/>
+  <arg name="second_tb3_z_pos" default=" 0.0"/>
+  <arg name="second_tb3_yaw"   default=" 1.57"/>
+
+  <arg name="third_tb3_x_pos" default=" 0.5"/>
+  <arg name="third_tb3_y_pos" default=" 3.0"/>
+  <arg name="third_tb3_z_pos" default=" 0.0"/>
+  <arg name="third_tb3_yaw"   default=" 0.0"/>
+
+  <!-- To Turn off Gazebo and RViz UI change gazebo_gui, start_rviz, and use_trajectory_controller to false-->
+  <!-- Start the GUIs -->
+  <arg name="start_gazebo" default="true"/>
+  <arg name="gazebo_gui"   default ="true"/>
+  <!-- Rviz config -->
+  <arg name="start_rviz" default="true"/>
+  <arg name="rviz_config" value="$(find trina2_gazebo)/rviz/rviz_config.rviz" />
+
+  <!-- Gazebo parameters -->
+  <arg name="use_sim_time" default="true"/>
+  <arg name="debug" default="false" />
+  <arg name="cyclic_data_publish_rate" default="30"/> <!--Hz-->
+  <!-- use trajectory controllers and MoveIt -->
+  <arg name="use_trajectory_controller" default="false"/>
+  <arg name="paused" default="$(arg use_trajectory_controller)"/>
+
+  <!-- Gazebo environment -->
+  <env name="GAZEBO_MODEL_PATH" value="$(find hospital_gazebo)/models:${GAZEBO_MODEL_PATH}" />
+  <arg name="world_name" default="hospital_small"/>
+  <arg name="world_file" default="$(find hospital_gazebo)/worlds/$(arg world_name).world"/>
+    
+  <!-- Start Gazebo -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="gui" value="$(arg gazebo_gui)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    <arg name="debug" value="$(arg debug)"/>
+    <arg name="paused" value="$(arg paused)"/> 
+    <arg name="world_name" value="$(arg world_file)"/>
+  </include>
+
+  <!-- Start RViz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(arg rviz_config)" if="$(arg start_rviz)"/>
+
+  <!-- Map Server -->
+  <node name="map_server" pkg="map_server" type="map_server" args="$(find trina2_navigation)/maps/$(arg world_name).yaml">
+    <param name="frame_id" value="/map" />
+  </node> 
+
+  <group ns = "$(arg first_tb3)">
+     <include file="$(find middleman)/launch/TB3_single.launch" >
+       <arg name="robot_name" value="$(arg first_tb3)"/>
+       <arg name="prefix" value="$(arg first_tb3)/"/>
+       <arg name="cyclic_data_publish_rate"  value="$(arg cyclic_data_publish_rate)"/>
+            
+       <arg name="x0" value="0"/>
+       <arg name="y0" value="-1"/>
+       <arg name="yaw" value="1.57"/>
+    </include>
+
+    <param name="amcl/initial_pose_x" value="0" />
+    <param name="amcl/initial_pose_y" value="-1" />
+    <param name="amcl/initial_pose_a" value="1.57" />
+  </group>
+
+  <group ns = "$(arg second_tb3)">
+    <include file="$(find middleman)/launch/TB3_single.launch" >
+      <arg name="robot_name" value="$(arg second_tb3)"/>
+      <arg name="prefix" value="$(arg second_tb3)/"/>
+      <arg name="cyclic_data_publish_rate"  value="$(arg cyclic_data_publish_rate)"/>
+            
+      <arg name="x0" value="0"/>
+      <arg name="y0" value="-2"/>
+      <arg name="yaw" value="1.57"/>
+    </include>
+
+    <param name="amcl/initial_pose_x" value="0" />
+    <param name="amcl/initial_pose_y" value="-2" />
+    <param name="amcl/initial_pose_a" value="1.57" />
+  </group>
+
+  <group ns = "$(arg third_tb3)">
+    <include file="$(find middleman)/launch/TB3_single.launch" >
+      <arg name="robot_name" value="$(arg third_tb3)"/>
+      <arg name="prefix" value="$(arg third_tb3)/"/>
+      <arg name="cyclic_data_publish_rate"  value="$(arg cyclic_data_publish_rate)"/>
+            
+      <arg name="x0" value="0"/>
+      <arg name="y0" value="7.5"/>
+      <arg name="yaw" value="1.57"/>
+    </include>
+
+    <param name="amcl/initial_pose_x" value="0" />
+    <param name="amcl/initial_pose_y" value="7.5" />
+    <param name="amcl/initial_pose_a" value="1.57" />
+  </group>
+
+</launch>
