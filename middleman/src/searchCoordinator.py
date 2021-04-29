@@ -210,7 +210,7 @@ class SearchCoordinator:
         shortest_dist = float('inf')
         for g in self.guard_list:
             d = g.get_distance(robot_pos[0], robot_pos[1])
-            print("guard: " + str(g) + " need searching? " + str(g.needs_searching()))
+            # print("guard: " + str(g) + " need searching? " + str(g.needs_searching()))
             if (d < shortest_dist) and (g.needs_searching()):
                 shortest_dist = d
                 closest_guard = g

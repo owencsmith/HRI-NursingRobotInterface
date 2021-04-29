@@ -495,7 +495,7 @@ class TrapezoidalDecomposition:
 
         if abs(right_free_counter - left_free_counter) > 1:
             # if right_free_counter!=left_free_counter:
-            ratio = free_counter / (free_counter + obstacle_counter)
+            ratio = float(free_counter) / float((free_counter + obstacle_counter))
             if ratio >= 0.5:
                 return True
             else:

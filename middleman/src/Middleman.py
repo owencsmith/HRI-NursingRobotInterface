@@ -792,8 +792,8 @@ class Middleman():
             items_list = ["scissors", "advil", "bandages", "advil"]
 
             sc.start_search(items_list)
-            for g in sc.guard_list:
-                print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
+            # for g in sc.guard_list:
+            #     print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
             wh = sc.get_width_and_height()
             # width = wh[0]
             # height = wh[1]
