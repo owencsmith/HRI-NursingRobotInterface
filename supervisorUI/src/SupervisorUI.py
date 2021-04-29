@@ -972,7 +972,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     gotta_get_them_points = item.polygon()
                     for i in range(gotta_get_them_points.size()):
                         qpoint = gotta_get_them_points[i]
-                        pt = self.QPoint_to_Point32(qpoint)
+                        pt = QPoint_to_Point32(qpoint)
                         p.points.append(pt)
                     obstacles.append(p)
                 elif isinstance(item, QGraphicsRectItem):
@@ -986,7 +986,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
                     gotta_get_them_points = [tl, tr, br, bl, tl]
                     for i in range(5):
                         qpoint = gotta_get_them_points[i]
-                        pt = self.QPoint_to_Point32(qpoint)
+                        pt = QPoint_to_Point32(qpoint)
                         p.points.append(pt)
                     obstacles.append(p)
             # print("sso")
