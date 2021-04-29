@@ -22,7 +22,6 @@ def load_map(file_path, resolution_scale):
     # Load the image with grayscale
     try:
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        print(script_dir)
         img = Image.open(os.path.join(script_dir, file_path)).convert('L')
     except:
         print("Image open failed")
@@ -113,10 +112,6 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
     ax.add_patch(Rectangle((90 - 0.5, 85 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
 
 
-
-
-
-
     # Optional draw visibility map
     if visibility_map is not None:
         node_pos = np.array(visibility_map.nodes)[:, [1, 0]]
@@ -167,15 +162,11 @@ class SearchCoordinator:
         self.td = TrapezoidalDecomposition(self.padded_map)
         
         self.centers = self.td.find_centers()
-        print(len(self.centers))
-        print(self.centers[-1])
 
         # Create list of guard objects
         self.guard_list = []
         for c in self.centers:
             self.guard_list.append(Guard(c[1], c[0]))
-        print(len(self.guard_list))
-
         self.search_list = []
 
     def get_width_and_height(self):

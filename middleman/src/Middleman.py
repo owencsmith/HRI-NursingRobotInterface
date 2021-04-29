@@ -116,6 +116,7 @@ class Middleman():
         self.mapSubscriber = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
         self.collaborativeSearchSubscriber = rospy.Subscriber('/collab', String, self.guard_searching)
 
+
     # check data length >= 4
     # process task determines which queue to put the task in
     def processTask(self, data):
@@ -521,9 +522,10 @@ class Middleman():
             print("Passing robot: " + robotToHelp.name + " to operator: " + newOperator.operatorID)
 
     def registerNewSupervisor(self, data):
-        print("registering new operator: " + data.data)
+        print("registering new supervisor: " + data.data)
         newSupervisor = Supervisor(data.data)
         # if a brand new supervisor exists and its the only, give them the tasks of the robots to start
+        print(len(self.activeSupervisorDictionary.values()))
         if (len(self.activeSupervisorDictionary.values()) == 0):
             # record the OG ID
             for task in self.unsupervisedTasks:
@@ -766,9 +768,9 @@ class Middleman():
 
     def checkNavStatus(self):
         posTolerance = .1
-        orientationTolerance = .3
+        orientationTolerance = 6.5
         for robot in self.activeRobotDictionary.values():
-            if (robot.currentTask.taskName == "NAV"):
+            if (robot.currentTask.taskName == "NAV") or (robot.currentTask.taskName == "SEARCH"):
                 quat = robot.pose.pose.pose.orientation
                 quat_list = [quat.x, quat.y, quat.z, quat.w]
                 robotEuler = euler_from_quaternion(quat_list)
@@ -785,8 +787,6 @@ class Middleman():
     def guard_searching(self):
         if len(self.activeRobotDictionary) > 0:
             sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
-            # rospy.sleep(10)
-            #sc.draw_guards()
 
             # Start search for scissors
             items_list = ["scissors", "advil", "bandages", "advil"]
@@ -795,19 +795,6 @@ class Middleman():
             # for g in sc.guard_list:
             #     print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
             wh = sc.get_width_and_height()
-            # width = wh[0]
-            # height = wh[1]
-            # rospy.logwarn("graph width: " + str(width))
-            # rospy.logwarn("graph height: " + str(height))
-            # rospy.logwarn("map width: " + str(self.map.info.width))
-            # rospy.logwarn("map height: " + str(self.map.info.height))
-            # rospy.logwarn("map resolution: " + str(self.map.info.resolution))
-            # hi_x = self.map.info.origin.position.x
-            # hi_y = self.map.info.origin.position.y
-            # rospy.logwarn("map origin x: " + str(hi_x))
-            # rospy.logwarn("map origin y: " + str(hi_y))
-
-            guard_list = list()
 
             robots = self.activeRobotDictionary.keys()
 
@@ -815,22 +802,33 @@ class Middleman():
             for robotName in robots:
                 robot = self.activeRobotDictionary.get(robotName)
 
-                if robot.currentTaskName == "IDLE":
+                if robot.currentTaskName == "IDLE" and len(self.activeSupervisorDictionary.values()) != 0:
                     x = robot.pose.pose.pose.position.x
                     y = robot.pose.pose.pose.position.y
+                    quat = robot.pose.pose.pose.orientation
+                    quat_list = [quat.x, quat.y, quat.z, quat.w]
+                    robotEuler = euler_from_quaternion(quat_list)
+                    yaw = robotEuler[2]
+
                     if x != 0 and y != 0:
+                        sup = list(self.activeSupervisorDictionary.keys())
+
+                        rospy.logwarn("Robot " + str(robotName) + " is no longer idle, sending to guard")
+                        robot.currentTaskName = "SEARCH"
+                        aTask = Task("SEARCH",1,robotName,x,y,yaw,False,sup[0])
+                        robot.currentTask = aTask.convertTaskToTaskMsg()
 
                         rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
-
                         pt_to_search = self.transform_realworld_to_map((x,y),wh)
-
                         rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
                         a_guard, guard_position = sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
-                        # sc.draw_guards_gone_to(a_guard)
                         rospy.logwarn("guard: " + str(guard_position))
                         map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
                         self.sendRobotToPos(robot, map_pt[0], map_pt[1])
+
+                else:
+                    rospy.loginfo("Robot not idle or no supervisor")
 
 
     def transform_realworld_to_map(self, pt, trap_graph_wh):
@@ -858,25 +856,6 @@ class Middleman():
         # transformed_pt = (0, 0)
         return transformed_pt
 
-    #     transformed_pt = []
-    #     res = self.map.info.resolution
-    #     hi_x = abs(self.map_origin.position.x)
-    #     hi_y = abs(self.map_origin.position.y)
-    #
-    #     x = (np.interp(pt.x, [-hi_x, hi_x], [0, (hi_x * 2)]))
-    #     y = (np.interp(pt.y, [-hi_y, hi_y], [0, (hi_y * 2)]))
-    #     transformed_pt.append(int(x / res))
-    #     transformed_pt.append(int(y / res))
-    #
-    # #     transformed_pt = list()
-    # #     hi_x = abs(self.map.info.origin.position.x)
-    # #     hi_y = abs(self.map.info.origin.position.y)
-    # #
-    # #     transformed_pt.append(int(np.interp(pt[0], [-hi_x, hi_x], [0, self.map.info.width])))
-    # #     transformed_pt.append(int(np.interp(pt[1], [-hi_y, hi_y], [0, self.map.info.height])))
-    # #
-    # #     return transformed_pt
-
 
     def transform_map_to_realworld(self, pt, trap_graph_wh):
         transformed_pt = []
@@ -896,30 +875,6 @@ class Middleman():
         rospy.logwarn("transformed point guard to world is: " + str(transformed_pt))
         # transformed_pt = (0,0)
         return transformed_pt
-
-        # x = (np.interp(pt[0]*res, [0, (hi_x * 2)], [-hi_x, hi_x]))
-        # y = (np.interp(pt[1]*res, [0, (hi_y * 2)], [-hi_y, hi_y]))
-        # transformed_pt.append(x)
-        # transformed_pt.append(y)
-
-        # resolution = self.map.info.resolution
-        # world_width = self.map.info.width
-        # world_height = self.map.info.height
-        # hi_x = self.map.info.origin.position.x
-        # hi_y = self.map.info.origin.position.y
-        #
-        # # translated_x = pt[0] - (shape_map[0]/2)
-        # # translated_y = pt[1] - (shape_map[1]/2)
-        #
-        # transformed_pt.append((world_width/shape_map[0])*resolution)
-        # transformed_pt.append((world_height/shape_map[1])*resolution)
-        #
-        # # transformed_pt.append(int(np.interp(pt[0], [0, self.map.info.width], [-hi_x, hi_x])))
-        # # transformed_pt.append(int(np.interp(pt[1], [0, self.map.info.height], [-hi_y, hi_y])))
-
-        # rospy.logwarn("transformed pt: " + str(transformed_pt))
-        #
-        # return transformed_pt
 
 
     def map_callback(self, msg):

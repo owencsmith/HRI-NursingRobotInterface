@@ -11,11 +11,6 @@ class TrapezoidalDecomposition:
         self.map_array = map_array  # map array, 1->free, 0->obstacle
         self.size_row = map_array.shape[0]  # map size
         self.size_col = map_array.shape[1]
-        print(self.size_col)
-        print(self.size_row)
-        print(np.__version__)
-        print(scipy.__version__)
-        print(matplotlib.__version__)
 
     def create_trapezoids(self):
 
@@ -30,7 +25,6 @@ class TrapezoidalDecomposition:
                     if self.is_vertex((r, c), 0, self.size_row, self.size_col):
                         count2 += 1
                         vertices.append((r, c))
-        print("If count1: " + str(count) + " If count2: " + str(count2))
         # return vertices
 
         for vertice in vertices:
@@ -64,7 +58,6 @@ class TrapezoidalDecomposition:
 
         # Find the vertuces and edges of the trapezoids
         self.create_trapezoids()
-        print("Trap Decomp Vertices: " + str(len(self.vertices)))
 
         # Draw the trapezoid boundaries in the map
         updated_map_array = copy.deepcopy(self.map_array)
