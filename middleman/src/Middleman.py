@@ -161,8 +161,6 @@ class Middleman():
             priorityRaised = True
         print('Split Task Data')
         print("PRIORITY RAISED: ", priorityRaised)
-        print(len(dataList))
-        print(dataList)
 
         # if len(dataList) > 5:
         #     variables = dataList[5]
@@ -204,6 +202,14 @@ class Middleman():
         currentRobot.currentTaskName = taskMsg.taskName
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
         pass
+
+    def searchTask(self, taskMsg):
+        print("Processing Search Goal")
+        # parses Robot name XY string and sends to robots movebase
+        currentRobot = self.activeRobotDictionary[taskMsg.robotName]
+        currentRobot.currentTask = taskMsg
+        currentRobot.currentTaskName = taskMsg.taskName
+        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
 
     def clnTask(self, taskMsg):
         """
@@ -803,12 +809,15 @@ class Middleman():
                 robotEuler = euler_from_quaternion(quat_list)
                 robYaw = robotEuler[2]
 
+                print(robotName + " dist x: " + str(abs(robot.pose.pose.pose.position.x - robot.currentTask.X)) + "dist y: " + str(abs(robot.pose.pose.pose.position.y - robot.currentTask.Y)))
+
                 if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
                         (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and
                         (abs(robYaw - robot.currentTask.yaw) <= orientationTolerance)):
                     # if we do via points, instead of IDLE task, send next position in via points list
                     self.setRobotToIdle(robot)
                     self.sc.mark_guard_searched(self.guardDictionary.get(robotName),[])
+                    rospy.logwarn("SETTING " + robotName + " BACK TO IDLE")
 
             pass
 
@@ -843,23 +852,21 @@ class Middleman():
                         sup = list(self.activeSupervisorDictionary.keys())
 
                         rospy.logwarn("Robot " + str(robotName) + " is no longer idle, sending to guard")
-                        robot.currentTaskName = "SEARCH"
-                        aTask = Task("SEARCH",0,robotName,x,y,yaw,False,sup[0])
-                        robot.currentTask = aTask.convertTaskToTaskMsg()
 
-                        # rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
+                        rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
                         pt_to_search = self.transform_realworld_to_map((x,y),wh)
-                        # rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
+                        rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
                         a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
                         # rospy.logwarn("guard: " + str(guard_position))
                         self.guardDictionary[robotName] = a_guard
                         map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
-                        self.sendRobotToPos(robot, map_pt[0], map_pt[1])
+                        # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
+                        self.searchTask(Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False, sup[0]).convertTaskToTaskMsg())
 
                 else:
                     rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
-
+                    rospy.loginfo("Robot " + robotName + " task location: " + str(robot.currentTask.X) + ", " + str(robot.currentTask.Y))
 
     def transform_realworld_to_map(self, pt, trap_graph_wh):
 
@@ -874,7 +881,7 @@ class Middleman():
         # print(map_width)
         # print(trap_graph_width)
         translated_x = (pt[0] - origin_x)/res
-        translated_y = (-pt[1] - origin_y)/res
+        translated_y = -(pt[1] - origin_y)/res + map_height
         # rospy.logwarn("intermediate point is " + str([translated_x, translated_y]))
         scaled_x = translated_x * (trap_graph_width / map_width)
         scaled_y = translated_y * (trap_graph_height / map_height)
@@ -899,9 +906,14 @@ class Middleman():
 
         scaled_x = pt[0]*(map_width/trap_graph_width)
         scaled_y = pt[1]*(map_height/trap_graph_height)
+        # scaled_y = pt[1]-map_height*(map_height/trap_graph_height)
 
+        # transformed_pt.append(scaled_x*res + origin_x)
+        # transformed_pt.append(-(scaled_y*res + origin_y))
         transformed_pt.append(scaled_x*res + origin_x)
-        transformed_pt.append(-(scaled_y*res + origin_y))
+        transformed_pt.append(-(scaled_y-map_height)*res + origin_y)
+
+
         # rospy.logwarn("transformed point guard to world is: " + str(transformed_pt))
         # transformed_pt = (0,0)
         return transformed_pt

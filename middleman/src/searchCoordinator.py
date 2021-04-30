@@ -102,9 +102,9 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
             ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='r', facecolor='r'))
 
     #GRAPH ROBOTS POSITIONS (ex ros output "robot trina2_3 trap graph position is 89, 44" plug in (89 - 0.5, 44 - 0.5) into Rectangle
-    ax.add_patch(Rectangle((89 - 0.5, 44 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
-    ax.add_patch(Rectangle((89 - 0.5, 95 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
-    ax.add_patch(Rectangle((89 - 0.5, 101 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+    ax.add_patch(Rectangle((89 - 0.5, 37 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+    ax.add_patch(Rectangle((89 - 0.5, 94 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+    ax.add_patch(Rectangle((89 - 0.5, 88 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
 
     #GRAPH THEIR GUARDS (ex ros output is "guard: [88, 91]" plug in (88 - 0.5, 91 - 0.5) into Rectangle
     ax.add_patch(Rectangle((87 - 0.5, 44 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
