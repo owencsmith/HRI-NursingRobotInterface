@@ -356,6 +356,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
             taskInfo = item.split()
             self.RobotTasks[taskInfo[0]] = (taskInfo[1], taskInfo[2], taskInfo[3])
             self.RobotTasksToCode[taskInfo[1]] = taskInfo[0]
+        self.RobotTasks['SEARCH'] = ['Search', 'False', '#FFC0CB']
+        self.RobotTasksToCode['Search'] = 'SEARCH'
+
 
     def populateTaskComboBox(self):
         #will eventually use service request for tasks

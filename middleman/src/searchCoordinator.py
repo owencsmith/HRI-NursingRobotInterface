@@ -133,9 +133,10 @@ class Guard:
         self.y = y
         self.items_to_search_for = []
         self.being_searched = False
+        self.already_searched = False
 
     def needs_searching(self):
-        if (len(self.items_to_search_for) > 0) and (not self.being_searched):
+        if (len(self.items_to_search_for) > 0) and (not self.being_searched) and (not self.already_searched):
             return True
         return False
 
@@ -218,6 +219,7 @@ class SearchCoordinator:
 
         # guard.items_to_search_for = []
         guard.being_searched = False
+        guard.already_searched = True
 
     def reassign_guard(self, guard):
         guard.being_searched = False

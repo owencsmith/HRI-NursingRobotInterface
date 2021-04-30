@@ -116,6 +116,11 @@ class Middleman():
         self.mapSubscriber = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
         self.collaborativeSearchSubscriber = rospy.Subscriber('/collab', String, self.guard_searching)
 
+        self.sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
+
+        self.searchStarted = False
+        self.guardDictionary = {}
+
 
     # check data length >= 4
     # process task determines which queue to put the task in
@@ -525,7 +530,6 @@ class Middleman():
         print("registering new supervisor: " + data.data)
         newSupervisor = Supervisor(data.data)
         # if a brand new supervisor exists and its the only, give them the tasks of the robots to start
-        print(len(self.activeSupervisorDictionary.values()))
         if (len(self.activeSupervisorDictionary.values()) == 0):
             # record the OG ID
             for task in self.unsupervisedTasks:
@@ -768,9 +772,9 @@ class Middleman():
 
     def checkNavStatus(self):
         posTolerance = .1
-        orientationTolerance = 6.5
+        orientationTolerance = 0.3
         for robot in self.activeRobotDictionary.values():
-            if (robot.currentTask.taskName == "NAV") or (robot.currentTask.taskName == "SEARCH"):
+            if (robot.currentTask.taskName == "NAV"):
                 quat = robot.pose.pose.pose.orientation
                 quat_list = [quat.x, quat.y, quat.z, quat.w]
                 robotEuler = euler_from_quaternion(quat_list)
@@ -784,17 +788,42 @@ class Middleman():
 
             pass
 
+    def checkSearchStatus(self):
+        posTolerance = .1
+        orientationTolerance = 6.5
+
+        robots = self.activeRobotDictionary.keys()
+
+        # for robot in self.activeRobotDictionary.values():
+        for robotName in robots:
+            robot = self.activeRobotDictionary.get(robotName)
+            if (robot.currentTask.taskName == "SEARCH"):
+                quat = robot.pose.pose.pose.orientation
+                quat_list = [quat.x, quat.y, quat.z, quat.w]
+                robotEuler = euler_from_quaternion(quat_list)
+                robYaw = robotEuler[2]
+
+                if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
+                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and
+                        (abs(robYaw - robot.currentTask.yaw) <= orientationTolerance)):
+                    # if we do via points, instead of IDLE task, send next position in via points list
+                    self.setRobotToIdle(robot)
+                    self.sc.mark_guard_searched(self.guardDictionary.get(robotName),[])
+
+            pass
+
     def guard_searching(self):
+
         if len(self.activeRobotDictionary) > 0:
-            sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
 
-            # Start search for scissors
-            items_list = ["scissors", "advil", "bandages", "advil"]
+            if not self.searchStarted:
+                items_list = ["scissors", "advil", "bandages", "advil"]
+                self.sc.start_search(items_list)
+                self.searchStarted = True
 
-            sc.start_search(items_list)
             # for g in sc.guard_list:
             #     print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
-            wh = sc.get_width_and_height()
+            wh = self.sc.get_width_and_height()
 
             robots = self.activeRobotDictionary.keys()
 
@@ -815,20 +844,21 @@ class Middleman():
 
                         rospy.logwarn("Robot " + str(robotName) + " is no longer idle, sending to guard")
                         robot.currentTaskName = "SEARCH"
-                        aTask = Task("SEARCH",1,robotName,x,y,yaw,False,sup[0])
+                        aTask = Task("SEARCH",0,robotName,x,y,yaw,False,sup[0])
                         robot.currentTask = aTask.convertTaskToTaskMsg()
 
-                        rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
+                        # rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
                         pt_to_search = self.transform_realworld_to_map((x,y),wh)
-                        rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
+                        # rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
-                        a_guard, guard_position = sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
-                        rospy.logwarn("guard: " + str(guard_position))
+                        a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
+                        # rospy.logwarn("guard: " + str(guard_position))
+                        self.guardDictionary[robotName] = a_guard
                         map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
                         self.sendRobotToPos(robot, map_pt[0], map_pt[1])
 
                 else:
-                    rospy.loginfo("Robot not idle or no supervisor")
+                    rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
 
 
     def transform_realworld_to_map(self, pt, trap_graph_wh):
@@ -852,7 +882,7 @@ class Middleman():
         # GUARD IS ROW, COL
         transformed_pt.append(int(scaled_x))
         transformed_pt.append(int(scaled_y))
-        rospy.logwarn("transformed point world to guard is: " + str(transformed_pt))
+        # rospy.logwarn("transformed point world to guard is: " + str(transformed_pt))
         # transformed_pt = (0, 0)
         return transformed_pt
 
@@ -872,7 +902,7 @@ class Middleman():
 
         transformed_pt.append(scaled_x*res + origin_x)
         transformed_pt.append(-(scaled_y*res + origin_y))
-        rospy.logwarn("transformed point guard to world is: " + str(transformed_pt))
+        # rospy.logwarn("transformed point guard to world is: " + str(transformed_pt))
         # transformed_pt = (0,0)
         return transformed_pt
 
@@ -892,5 +922,6 @@ while not rospy.is_shutdown():
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
     middleman.checkNavStatus()
+    middleman.checkSearchStatus()
     middleman.guard_searching()
     middleman.rate.sleep()
