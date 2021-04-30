@@ -121,6 +121,10 @@ class Middleman():
         self.searchStarted = False
         self.guardDictionary = {}
 
+        self.robot_stuck_count = {}
+        self.robot_previous_poses = {}
+        self.robot_resend_amt = {}
+
 
     # check data length >= 4
     # process task determines which queue to put the task in
@@ -646,6 +650,8 @@ class Middleman():
         if robot.supervisorID == '':
             return  # just return because the robot should already be Idle
         info_str = robot.supervisorID + ' ' + 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+        self.robot_stuck_count[robot.name] = 0
+        print("Setting Robot " + str(robot.name) + " count to 0")
         self.processTask(info_str)
 
     def findOperatorFromRobot(self, robot):
@@ -798,13 +804,15 @@ class Middleman():
             pass
 
     def checkSearchStatus(self):
-        posTolerance = .1
+        posTolerance = .2
         orientationTolerance = 6.5
+        moveTolerance = 0.000005
 
         robots = self.activeRobotDictionary.keys()
 
         # for robot in self.activeRobotDictionary.values():
         for robotName in robots:
+
             robot = self.activeRobotDictionary.get(robotName)
             if (robot.currentTask.taskName == "SEARCH"):
                 quat = robot.pose.pose.pose.orientation
@@ -812,7 +820,7 @@ class Middleman():
                 robotEuler = euler_from_quaternion(quat_list)
                 robYaw = robotEuler[2]
 
-                print(robotName + " dist x: " + str(abs(robot.pose.pose.pose.position.x - robot.currentTask.X)) + "dist y: " + str(abs(robot.pose.pose.pose.position.y - robot.currentTask.Y)))
+                print(robotName + " dist x: " + str(abs(robot.pose.pose.pose.position.x - robot.currentTask.X)) + " dist y: " + str(abs(robot.pose.pose.pose.position.y - robot.currentTask.Y)))
 
                 if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
                         (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and
@@ -821,6 +829,31 @@ class Middleman():
                     self.setRobotToIdle(robot)
                     self.sc.mark_guard_searched(self.guardDictionary.get(robotName),[])
                     rospy.logwarn("SETTING " + robotName + " BACK TO IDLE")
+
+                elif self.robot_stuck_count.get(robotName) is not None:
+                    if self.robot_stuck_count.get(robotName) > 100:
+                        self.setRobotToIdle(robot)
+                        self.sc.mark_guard_searched(self.guardDictionary.get(robotName), [])
+                        rospy.logwarn("ROBOT " + robotName + " WAS STUCK!!! SETTING BACK TO IDLE")
+
+                if self.robot_previous_poses.get(robotName) is not None:
+                    prev_pose = self.robot_previous_poses.get(robotName)
+                    if ((abs(robot.pose.pose.pose.position.x - prev_pose[0]) <= moveTolerance) and
+                            (abs(robot.pose.pose.pose.position.y - prev_pose[1]) <= moveTolerance) and
+                            (abs(robYaw - prev_pose[2]) <= moveTolerance)):
+                        if self.robot_stuck_count.get(robotName) is not None:
+                            count = self.robot_stuck_count.get(robotName)
+                            self.robot_stuck_count[robotName] = count+1
+                            rospy.logwarn("current stuck count is " + str(count+1))
+                    else:
+                        if self.robot_stuck_count.get(robotName) is not None:
+                            self.robot_stuck_count[robotName] = 0
+                            rospy.logwarn("current stuck count is 0")
+
+                rospy.logwarn(robotName + " position is " + str(robot.pose.pose.pose.position.x) + ", " + str(robot.pose.pose.pose.position.y) + ", " + str(robYaw))
+
+                self.robot_previous_poses[robotName] = (robot.pose.pose.pose.position.x, robot.pose.pose.pose.position.y, robYaw)
+
 
             pass
 
@@ -832,6 +865,7 @@ class Middleman():
                 items_list = ["scissors", "advil", "bandages", "advil"]
                 self.sc.start_search(items_list)
                 self.searchStarted = True
+                rospy.loginfo("STARTED SEARCH")
 
             # for g in sc.guard_list:
             #     print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
@@ -843,33 +877,36 @@ class Middleman():
             for robotName in robots:
                 robot = self.activeRobotDictionary.get(robotName)
 
-                if robot.currentTaskName == "IDLE" and len(self.activeSupervisorDictionary.values()) != 0:
-                    x = robot.pose.pose.pose.position.x
-                    y = robot.pose.pose.pose.position.y
-                    quat = robot.pose.pose.pose.orientation
-                    quat_list = [quat.x, quat.y, quat.z, quat.w]
-                    robotEuler = euler_from_quaternion(quat_list)
-                    yaw = robotEuler[2]
+                if robotName == "trina2_3":
 
-                    if x != 0 and y != 0:
-                        sup = list(self.activeSupervisorDictionary.keys())
+                    if robot.currentTaskName == "IDLE" and len(self.activeSupervisorDictionary.values()) != 0:
+                        x = robot.pose.pose.pose.position.x
+                        y = robot.pose.pose.pose.position.y
+                        quat = robot.pose.pose.pose.orientation
+                        quat_list = [quat.x, quat.y, quat.z, quat.w]
+                        robotEuler = euler_from_quaternion(quat_list)
+                        yaw = robotEuler[2]
 
-                        rospy.logwarn("Robot " + str(robotName) + " is no longer idle, sending to guard")
+                        if x != 0 and y != 0:
+                            sup = list(self.activeSupervisorDictionary.keys())
 
-                        rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
-                        pt_to_search = self.transform_realworld_to_map((x,y),wh)
-                        rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
+                            rospy.logwarn("Robot " + str(robotName) + " is no longer idle, sending to guard")
 
-                        a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
-                        # rospy.logwarn("guard: " + str(guard_position))
-                        self.guardDictionary[robotName] = a_guard
-                        map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
-                        # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
-                        self.searchTask(Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False, sup[0]).convertTaskToTaskMsg())
+                            rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
+                            pt_to_search = self.transform_realworld_to_map((x,y),wh)
+                            rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
-                else:
-                    rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
-                    rospy.loginfo("Robot " + robotName + " task location: " + str(robot.currentTask.X) + ", " + str(robot.currentTask.Y))
+                            a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
+                            # rospy.logwarn("guard: " + str(guard_position))
+                            self.guardDictionary[robotName] = a_guard
+                            map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
+                            # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
+                            self.searchTask(Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False, sup[0]).convertTaskToTaskMsg())
+
+                    # else:
+                    #     rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
+                    #     rospy.loginfo("Robot " + robotName + " task location: " + str(robot.currentTask.X) + ", " + str(robot.currentTask.Y))
+
 
     def transform_realworld_to_map(self, pt, trap_graph_wh):
 
