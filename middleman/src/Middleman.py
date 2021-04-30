@@ -844,11 +844,11 @@ class Middleman():
                         if self.robot_stuck_count.get(robotName) is not None:
                             count = self.robot_stuck_count.get(robotName)
                             self.robot_stuck_count[robotName] = count+1
-                            rospy.logwarn("current stuck count is " + str(count+1))
+                            rospy.logwarn(robotName + "current stuck count is " + str(count+1))
                     else:
                         if self.robot_stuck_count.get(robotName) is not None:
                             self.robot_stuck_count[robotName] = 0
-                            rospy.logwarn("current stuck count is 0")
+                            rospy.logwarn(robotName + "current stuck count is 0")
 
                 rospy.logwarn(robotName + " position is " + str(robot.pose.pose.pose.position.x) + ", " + str(robot.pose.pose.pose.position.y) + ", " + str(robYaw))
 
@@ -877,31 +877,31 @@ class Middleman():
             for robotName in robots:
                 robot = self.activeRobotDictionary.get(robotName)
 
-                if robotName == "trina2_3":
+                # if robotName == "trina2_3":
 
-                    if robot.currentTaskName == "IDLE" and len(self.activeSupervisorDictionary.values()) != 0:
-                        x = robot.pose.pose.pose.position.x
-                        y = robot.pose.pose.pose.position.y
-                        quat = robot.pose.pose.pose.orientation
-                        quat_list = [quat.x, quat.y, quat.z, quat.w]
-                        robotEuler = euler_from_quaternion(quat_list)
-                        yaw = robotEuler[2]
+                if robot.currentTaskName == "IDLE" and len(self.activeSupervisorDictionary.values()) != 0:
+                    x = robot.pose.pose.pose.position.x
+                    y = robot.pose.pose.pose.position.y
+                    quat = robot.pose.pose.pose.orientation
+                    quat_list = [quat.x, quat.y, quat.z, quat.w]
+                    robotEuler = euler_from_quaternion(quat_list)
+                    yaw = robotEuler[2]
 
-                        if x != 0 and y != 0:
-                            sup = list(self.activeSupervisorDictionary.keys())
+                    if x != 0 and y != 0:
+                        sup = list(self.activeSupervisorDictionary.keys())
 
-                            rospy.logwarn("Robot " + str(robotName) + " is no longer idle, sending to guard")
+                        rospy.logwarn("Robot " + str(robotName) + " is no longer idle, sending to guard")
 
-                            rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
-                            pt_to_search = self.transform_realworld_to_map((x,y),wh)
-                            rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
+                        rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
+                        pt_to_search = self.transform_realworld_to_map((x,y),wh)
+                        rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
-                            a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
-                            # rospy.logwarn("guard: " + str(guard_position))
-                            self.guardDictionary[robotName] = a_guard
-                            map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
-                            # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
-                            self.searchTask(Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False, sup[0]).convertTaskToTaskMsg())
+                        a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
+                        # rospy.logwarn("guard: " + str(guard_position))
+                        self.guardDictionary[robotName] = a_guard
+                        map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
+                        # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
+                        self.searchTask(Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False, sup[0]).convertTaskToTaskMsg())
 
                     # else:
                     #     rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
