@@ -848,7 +848,7 @@ class Middleman():
                     else:
                         if self.robot_stuck_count.get(robotName) is not None:
                             self.robot_stuck_count[robotName] = 0
-                            rospy.logwarn(robotName + "current stuck count is 0")
+                            rospy.logwarn(robotName + " current stuck count is 0")
 
                 rospy.logwarn(robotName + " position is " + str(robot.pose.pose.pose.position.x) + ", " + str(robot.pose.pose.pose.position.y) + ", " + str(robYaw))
 
