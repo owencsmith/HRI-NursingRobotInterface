@@ -235,6 +235,83 @@
       <string>0 Deg</string>
      </property>
     </widget>
+    <widget class="QScrollArea" name="WaypointScroll">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>560</y>
+       <width>131</width>
+       <height>101</height>
+      </rect>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::NoFrame</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Plain</enum>
+     </property>
+     <property name="sizeAdjustPolicy">
+      <enum>QAbstractScrollArea::AdjustToContents</enum>
+     </property>
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignHCenter|Qt::AlignTop</set>
+     </property>
+     <widget class="QWidget" name="WaypointScrollContents">
+      <property name="geometry">
+       <rect>
+        <x>57</x>
+        <y>0</y>
+        <width>16</width>
+        <height>101</height>
+       </rect>
+      </property>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <widget class="QWidget" name="verticalLayoutWidget">
+       <property name="geometry">
+        <rect>
+         <x>-20</x>
+         <y>0</y>
+         <width>271</width>
+         <height>31</height>
+        </rect>
+       </property>
+       <layout class="QVBoxLayout" name="WaypointVBox" stretch="">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="sizeConstraint">
+         <enum>QLayout::SetDefaultConstraint</enum>
+        </property>
+        <property name="leftMargin">
+         <number>1</number>
+        </property>
+        <property name="topMargin">
+         <number>1</number>
+        </property>
+        <property name="rightMargin">
+         <number>1</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+       </layout>
+      </widget>
+     </widget>
+    </widget>
    </widget>
    <widget class="QPushButton" name="CreateTaskButton">
     <property name="geometry">
@@ -475,7 +552,7 @@ background-color: rgb(211, 215, 207);</string>
     </property>
     <property name="icon">
      <iconset>
-      <normaloff>../../../../../Pictures/polygon.png</normaloff>../../../../../Pictures/polygon.png</iconset>
+      <normaloff>../../../../../../../../Pictures/polygon.png</normaloff>../../../../../../../../Pictures/polygon.png</iconset>
     </property>
     <property name="iconSize">
      <size>
@@ -498,7 +575,7 @@ background-color: rgb(211, 215, 207);</string>
     </property>
     <property name="icon">
      <iconset>
-      <normaloff>../../../../../Pictures/Scribble.png</normaloff>../../../../../Pictures/Scribble.png</iconset>
+      <normaloff>../../../../../../../../Pictures/Scribble.png</normaloff>../../../../../../../../Pictures/Scribble.png</iconset>
     </property>
     <property name="iconSize">
      <size>
@@ -521,7 +598,7 @@ background-color: rgb(211, 215, 207);</string>
     </property>
     <property name="icon">
      <iconset>
-      <normaloff>../../../../../Pictures/rectangle.png</normaloff>../../../../../Pictures/rectangle.png</iconset>
+      <normaloff>../../../../../../../../Pictures/rectangle.png</normaloff>../../../../../../../../Pictures/rectangle.png</iconset>
     </property>
     <property name="iconSize">
      <size>

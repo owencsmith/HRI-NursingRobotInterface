@@ -57,6 +57,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.mapWidth = 0
         self.numAnimationSteps = 20
         self.fitToScreen(width, height)
+        self.NavWaypoints = []
         self.RobotShapes = []
         self.LocationTargetShapes = []
         self.AllRobotNames = []
@@ -460,10 +461,11 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
     def mapClickEventHandler(self, event):
         self.removeGoalItem()
+        click = event.button()
         if self.pickLocation:
-            if self.LocationPicked:
-                for item in self.LocationTargetShapes:
-                    self.scene.removeItem(item)
+            # if self.LocationPicked:
+            #     for item in self.LocationTargetShapes:
+            #         self.scene.removeItem(item)
             self.clickedX = event.scenePos().x()
             self.clickedY = event.scenePos().y()
             self.LocationCoordinates = (round(self.clickedX / 100, 3), round(-self.clickedY / 100, 3))
@@ -478,15 +480,19 @@ class SupervisorUI(QtWidgets.QMainWindow):
             #####################################################################
             self.pickLocation = False
             self.LocationPicked = True
-            self.drawPoseArrow()
+            arrow = self.drawPoseArrow()
+            new_label = QtWidgets.QLabel()
+            self.WaypointVBox.addWidget(new_label)
+            waypoint = NavigationWaypoint(self.clickedX, self.clickedY, self.poseYaw, shapes, arrow, new_label)
+            self.NavWaypoints.append(waypoint)
             self.SelectLocationBTN.setEnabled(True)
         elif self.sketchMode:
-            if event.button() == QtCore.Qt.LeftButton:
+            if click == QtCore.Qt.LeftButton:
                 self.left_click = True
                 # We use the graphics group to hold all polygon pieces so we dont create a new one if mid process
                 if not self.firstPolygonPoint:
                     self.graphics_group = self.scene.createItemGroup([])
-            elif event.button() == QtCore.Qt.RightButton:
+            elif click == QtCore.Qt.RightButton:
                 self.right_click = True
 
     def mapMouseMoveEventHandler(self, event):
@@ -826,6 +832,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             for line in lines:
                 self.poseShapes.append(line)
                 self.scene.addItem(line)
+        return lines
 
     def CamRosCallback(self, result):
         self.CamUpdateSignal.emit(result)
@@ -941,6 +948,15 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.PoseDeg.move(self.slideInMenuWidth * 0.80, self.windowHeight * 0.24)
         self.PoseDeg.resize(self.slideInMenuWidth * 0.2, self.windowHeight * 0.04)
 
+        self.WaypointScroll.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.4)
+        self.WaypointScroll.resize(self.slideInMenuWidth*0.9, self.windowHeight * 0.5)
+        self.WaypointScrollContents.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.4)
+        self.WaypointScrollContents.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.5)
+        self.WaypointScroll.setFixedWidth(self.slideInMenuWidth*0.9)
+        self.WaypointScrollContents.setFixedWidth(self.slideInMenuWidth * 0.9)
+        self.WaypointScroll.setAlignment(Qt.AlignHCenter)
+        self.WaypointVBox.setAlignment(Qt.AlignHCenter)
+
         self.ConfirmTask.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.28)
         self.ConfirmTask.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.04)
 
@@ -1009,6 +1025,33 @@ class SideMenuThread(QThread):
             time.sleep(self.numSec / self.numSteps)
             self.signal.emit(x)
 
+
+class NavigationWaypoint:
+    def __init__(self, x, y, yaw, target, arrow, label):
+
+        self._X = x
+        self._Y = y
+        self._yaw = yaw
+        self.target = target
+        self.arrow = arrow
+        self.Label = label
+        self.Label.setText("X: " + "{:.2f}".format(self._X / 100) + " Y: " + "{:.2f}".format(
+            -self._Y / 100) + " Yaw: " + str(self._yaw))
+
+    def updateX(self, x):
+        self._X = x
+        self.Label.setText("X: " + "{:.2f}".format(self._X / 100) + " Y: " + "{:.2f}".format(
+            -self._Y / 100) + " Yaw: " + str(self._yaw))
+
+    def updateY(self, y):
+        self._Y = y
+        self.Label.setText("X: " + "{:.2f}".format(self._X / 100) + " Y: " + "{:.2f}".format(
+            -self._Y / 100) + " Yaw: " + str(self._yaw))
+
+    def updateYaw(self, yaw):
+        self._yaw = yaw
+        self.Label.setText("X: " + "{:.2f}".format(self._X / 100) + " Y: " + "{:.2f}".format(
+            -self._Y / 100) + " Yaw: " + str(self._yaw))
 
 if __name__ == '__main__':
     nodeID = "supervisorUI_" + str(int(time.time()))
