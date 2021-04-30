@@ -642,6 +642,9 @@ class Middleman():
                 supervisor.taskPriorityQueue.append(task)
 
     def setRobotToIdle(self, robot):
+        # check for if not assigned to a supervisor
+        if robot.supervisorID == '':
+            return  # just return because the robot should already be Idle
         info_str = robot.supervisorID + ' ' + 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
         self.processTask(info_str)
 
