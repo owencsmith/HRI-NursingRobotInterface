@@ -235,6 +235,41 @@
       <string>0 Deg</string>
      </property>
     </widget>
+    <widget class="QListWidget" name="WaypointList">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>580</y>
+       <width>181</width>
+       <height>192</height>
+      </rect>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::Box</enum>
+     </property>
+    </widget>
+    <widget class="QLabel" name="WaypointLabel">
+     <property name="geometry">
+      <rect>
+       <x>50</x>
+       <y>560</y>
+       <width>81</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Waypoints</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
    </widget>
    <widget class="QPushButton" name="CreateTaskButton">
     <property name="geometry">
