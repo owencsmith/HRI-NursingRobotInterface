@@ -113,7 +113,7 @@ class Middleman():
 
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
-        rospy.Subscriber("/supervisor/task", String, self.processTask)
+        rospy.Subscriber("/supervisor/task", TaskMsg, self.processTask)
         rospy.Subscriber("/supervisor/removeTask", String, self.removeFromPriorityQueue)
         rospy.Subscriber("/operator/done_helping", String, self.advanceRobotHelpQueue)
         rospy.Subscriber("/operator/request_extra_views_from_robot", String, self.sendAnotherRobotForCameraViews)
@@ -153,7 +153,7 @@ class Middleman():
         and calls the apprropriate task function. It also adds the task to the
         active task list if a robot is assigned, or a priority queue if no robot
         is assigned. Please look at the task code data structure above to see what that task codes mean. 
-        :param data: the string containing the robot and task information.
+        :param data: a task message containing the robot and task information.
                      i.e. <task name> <robot name> <X coordinate> <Y coordinate>
         :return None
         """
@@ -161,31 +161,37 @@ class Middleman():
         # have to know what the task is
         # Task Strings: 'task_name robot_name X Y [vars ...]'
         # DLV vars = fromX fromY
-        if type(data) == str:
-            dataList = data.split()
-            if (data == ""):
-                return
-        else:
-            if(data.data == ""):
-                return
-            dataList = data.data.split()
+        # if type(data) == str:
+        #     dataList = data.split()
+        #     if (data == ""):
+        #         return
+        # else:
+        #     if(data.data == ""):
+        #         return
+        #     dataList = data.data.split()
 
-        supervisorID = dataList[0]
+        # supervisorID = dataList[0]
+        supervisorID = data.OGSupervisorID
         supervisor = self.activeSupervisorDictionary[supervisorID]
-        taskName = dataList[1]
+        # taskName = dataList[1]
+        taskName = data.taskName
         # passed as unassigned if task is not assigned
-        robotName = dataList[2]
+        # robotName = dataList[2]
+        robotName = data.robotName
 
-        yaw = -float(dataList[5]) + np.pi
-        raisePriority = dataList[6]
+        # yaw = -float(dataList[5]) + np.pi
+        yaw = data.yaw # + np.pi
+        # raisePriority = dataList[6]
+        raisePriority = data.isRaisedPriority
         if (raisePriority == "False"):
             priorityRaised = False
         else:
             priorityRaised = True
         print('Split Task Data')
-        print("PRIORITY RAISED: ", priorityRaised)
-        print(len(dataList))
-        print(dataList)
+        variables = data.variables
+        # print("PRIORITY RAISED: ", priorityRaised)
+        # print(len(dataList))
+        # print(dataList)
 
         # if len(dataList) > 5:
         #     variables = dataList[5]
@@ -193,9 +199,9 @@ class Middleman():
         #     variables = " "
 
         if (taskName != 'SOS'):
-            X = float(dataList[3])
-            Y = float(dataList[4])
-            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised, supervisorID)
+            X = data.X #float(dataList[3])
+            Y = data.Y #float(dataList[4])
+            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised, supervisorID, variables)
             newTaskMsg = newTask.convertTaskToTaskMsg()
             if robotName != "unassigned":
                 # remove current task form active task list
@@ -225,6 +231,7 @@ class Middleman():
         currentRobot = self.activeRobotDictionary[taskMsg.robotName]
         currentRobot.currentTask = taskMsg
         currentRobot.currentTaskName = taskMsg.taskName
+        print("Goal Yaw: " + str(float(taskMsg.yaw)))
         self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
         pass
 
@@ -333,8 +340,8 @@ class Middleman():
 
         poseStamped.pose.orientation.x = q_orientation[0]
         poseStamped.pose.orientation.y = q_orientation[1]
-        poseStamped.pose.orientation.w = q_orientation[2]
-        poseStamped.pose.orientation.z = q_orientation[3]
+        poseStamped.pose.orientation.z = q_orientation[2]
+        poseStamped.pose.orientation.w = q_orientation[3]
         topic = ''
         if currentRobot.name == 'trina2':
             topic = '/move_base_simple/goal'
@@ -463,20 +470,35 @@ class Middleman():
         robotToNavigateToY = robotToNavigateToPose.y - yBuffer
 
         supervisorWhosRobotIsStuck = self.activeSupervisorDictionary[robotToNavigateTo.supervisorID]
-        info_str = ""
+        # info_str = ""
+        msg = TaskMsg()
         # send it to the supervisor that issued a stuck request if the supervisor has more than 1 robot to work with
         if (len(supervisorWhosRobotIsStuck.activeRobotDictionary.values()) > 1):
-            info_str = supervisorWhosRobotIsStuck.supervisorID + ' ' + 'HLP' + ' ' + 'unassigned ' + str(
-                robotToNavigateToX) + ' ' + str(
-                robotToNavigateToY) + ' ' + str(robYaw + (7 * np.pi / 4)) + ' ' + 'False' + ' '
+            msg.OGSupervisorID = supervisorWhosRobotIsStuck.supervisorID
+            msg.taskName = 'HLP'
+            msg.robotName = 'unassigned'
+            msg.X = robotToNavigateToX
+            msg.Y = robotToNavigateToY
+            msg.yaw = robYaw + (7 * np.pi / 4)
+            msg.isRaisedPriority = 'False'
+            # info_str = supervisorWhosRobotIsStuck.supervisorID + ' ' + 'HLP' + ' ' + 'unassigned ' + str(
+            #     robotToNavigateToX) + ' ' + str(
+            #     robotToNavigateToY) + ' ' + str(robYaw + (7 * np.pi / 4)) + ' ' + 'False' + ' '
         else:
             for supervisor in self.activeSupervisorDictionary.values():
                 if (len(supervisor.activeRobotDictionary.values()) > 1):
-                    info_str = supervisor.supervisorID + ' ' + 'HLP' + ' ' + 'unassigned ' + str(
-                        robotToNavigateToX) + ' ' + str(
-                        robotToNavigateToY) + ' ' + str(robYaw + (7 * np.pi / 4)) + ' ' + 'False' + ' '
-        print(info_str)
-        self.processTask(info_str)
+                    msg.OGSupervisorID = supervisor.supervisorID
+                    msg.taskName = 'HLP'
+                    msg.robotName = 'unassigned'
+                    msg.X = robotToNavigateToX
+                    msg.Y = robotToNavigateToY
+                    msg.yaw = robYaw + (7 * np.pi / 4)
+                    msg.isRaisedPriority = 'False'
+                    # info_str = supervisor.supervisorID + ' ' + 'HLP' + ' ' + 'unassigned ' + str(
+                    #     robotToNavigateToX) + ' ' + str(
+                    #     robotToNavigateToY) + ' ' + str(robYaw + (7 * np.pi / 4)) + ' ' + 'False' + ' '
+        # print(info_str)
+        self.processTask(msg)
 
     def sendTaskCodesToSupervisor(self, req):
         """
@@ -661,8 +683,16 @@ class Middleman():
         # check for if not assigned to a supervisor
         if robot.supervisorID == '':
             return  # just return because the robot should already be Idle
-        info_str = robot.supervisorID + ' ' + 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
-        self.processTask(info_str)
+        msg = TaskMsg()
+        msg.OGSupervisorID = robot.supervisorID
+        msg.robotName = robot.name
+        msg.taskName = 'IDLE'
+        msg.X = 0
+        msg.Y = 0
+        msg.yaw = 0
+        msg.isRaisedPriority = 'False'
+        # info_str = robot.supervisorID + ' ' + 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
+        self.processTask(msg)
 
     def findOperatorFromRobot(self, robot):
         for operator in self.activeOperatorDictionary.values():
@@ -796,22 +826,42 @@ class Middleman():
                 self.reassignmentCounter = time.time()
 
     def checkNavStatus(self):
-        posTolerance = .1
-        orientationTolerance = .3
+        posTolerance = .15
+        orientationTolerance = .4
         for robot in self.activeRobotDictionary.values():
-            if (robot.currentTask.taskName == "NAV"):
+            if (robot.currentTask.taskName != "IDLE"):
                 quat = robot.pose.pose.pose.orientation
                 quat_list = [quat.x, quat.y, quat.z, quat.w]
                 robotEuler = euler_from_quaternion(quat_list)
                 robYaw = robotEuler[2]
+                # print(str(abs(robYaw - robot.currentTask.yaw)))
+                if robYaw < 0:
+                    robYaw = robYaw + 2*np.pi
+                print(str(abs(robYaw - robot.currentTask.yaw))) #+ " " + str(robYaw) + " " + str(robot.currentTask.yaw))
 
                 if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
                         (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and
                         (abs(robYaw - robot.currentTask.yaw) <= orientationTolerance)):
                     # if we do via points, instead of IDLE task, send next position in via points list
-                    self.setRobotToIdle(robot)
-
-            pass
+                    # print(robot.currentTask.variables)
+                    # if there is a number in the variable string
+                    if any(char.isdigit() for char in robot.currentTask.variables):
+                        msg = robot.currentTask
+                        # separate the specified waypoints
+                        waypoint_split = msg.variables.split(", ")
+                        # get the first one's x, y, yaw
+                        new_pos = waypoint_split[0].split()
+                        msg.X = float(new_pos[0])
+                        msg.Y = float(new_pos[1])
+                        msg.yaw = float(new_pos[2])
+                        new_var = ''
+                        for idx in range(len(waypoint_split)-1):
+                            if waypoint_split[idx+1] != ' ':
+                                new_var += waypoint_split[idx+1] + ", "
+                        msg.variables = new_var
+                        self.processTask(msg)
+                    else:
+                        self.setRobotToIdle(robot)
 
     def getBaseMap(self, map):
         # convert from row-major to 2D

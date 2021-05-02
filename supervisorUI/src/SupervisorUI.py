@@ -4,7 +4,7 @@ import rospkg
 from PyQt5 import QtCore, QtWidgets, uic
 from PyQt5.QtWidgets import QApplication, QGraphicsScene, QGraphicsEllipseItem, QGraphicsRectItem, QGraphicsTextItem, \
     QGraphicsView, QHeaderView, QTableWidgetItem, QListView, QGraphicsLineItem, QPushButton, QGraphicsItemGroup, \
-    QGraphicsPolygonItem
+    QGraphicsPolygonItem, QListWidgetItem
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QPainter, QColor, QPen, QBrush, qRgb, QTransform, QFont, QWheelEvent, QStandardItemModel, QIcon, \
     QImage, QPixmap, QRgba64, QPolygonF
@@ -83,7 +83,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.taskSubscriber = rospy.Subscriber('/' + id + '/taskList', TaskMsgArr, self.taskListRosCallback)
         self.taskChangeSubscriber = rospy.Subscriber('/' + id + '/taskReassignment', TaskMsgArr,
                                                      self.taskChangeCallback)
-        self.taskPublisher = rospy.Publisher("/supervisor/task", String, queue_size=10)
+        self.taskPublisher = rospy.Publisher("/supervisor/task", TaskMsg, queue_size=10)
         self.deleteTaskPublisher = rospy.Publisher("/supervisor/removeTask", String, queue_size=10)
         self.CamSubscriber = rospy.Subscriber('none', Image, self.CamRosCallback)
         rospy.wait_for_service('/supervisor/taskCodes')
@@ -191,6 +191,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.XLocLabel.setText("X:")
             self.YLocLabel.setText("Y:")
             self.LocationPicked = False
+            self.WaypointList.clear()
         else:
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
@@ -463,37 +464,41 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.removeGoalItem()
         click = event.button()
         if self.pickLocation:
-            # if self.LocationPicked:
-            #     for item in self.LocationTargetShapes:
-            #         self.scene.removeItem(item)
-            self.clickedX = event.scenePos().x()
-            self.clickedY = event.scenePos().y()
-            self.LocationCoordinates = (round(self.clickedX / 100, 3), round(-self.clickedY / 100, 3))
-            self.XLocLabel.setText("X: " + "{:.2f}".format(self.clickedX / 100))
-            self.YLocLabel.setText("Y: " + "{:.2f}".format(-self.clickedY / 100))
-            ##########################Draws Target on screen with 3 circles
-            obSize = 50
-            shapes = self.makeTarget(self.clickedX, self.clickedY, obSize, self.red)
-            for shape in shapes:
-                self.LocationTargetShapes.append(shape)
-                self.scene.addItem(shape)
-            #####################################################################
-            self.pickLocation = False
-            self.LocationPicked = True
-            arrow = self.drawPoseArrow()
-            new_label = QtWidgets.QLabel()
-            self.WaypointVBox.addWidget(new_label)
-            waypoint = NavigationWaypoint(self.clickedX, self.clickedY, self.poseYaw, shapes, arrow, new_label)
-            self.NavWaypoints.append(waypoint)
-            self.SelectLocationBTN.setEnabled(True)
+            if click == QtCore.Qt.LeftButton:
+                # if self.LocationPicked:
+                #     for item in self.LocationTargetShapes:
+                #         self.scene.removeItem(item)
+                self.clickedX = event.scenePos().x()
+                self.clickedY = event.scenePos().y()
+                self.LocationCoordinates = (round(self.clickedX / 100, 3), round(-self.clickedY / 100, 3))
+                self.XLocLabel.setText("X: " + "{:.2f}".format(self.clickedX / 100))
+                self.YLocLabel.setText("Y: " + "{:.2f}".format(-self.clickedY / 100))
+                ##########################Draws Target on screen with 3 circles
+                obSize = 50
+                shapes = self.makeTarget(self.clickedX, self.clickedY, obSize, self.red)
+                for shape in shapes:
+                    self.LocationTargetShapes.append(shape)
+                    self.scene.addItem(shape)
+                #####################################################################
+                self.pickLocation = False
+                self.LocationPicked = True
+                arrow = self.drawPoseArrow()
+                new_label = QListWidgetItem("X: " + "{:.2f}".format(self.clickedX / 100) + " Y: " + "{:.2f}".format(
+                - self.clickedY / 100) + " Yaw: " + str(self.PoseSlider.value()))
+                self.WaypointList.addItem(new_label)
+                waypoint = NavigationWaypoint(self.clickedX, self.clickedY, self.PoseSlider.value(), shapes, arrow, new_label)
+                self.NavWaypoints.append(waypoint)
+                self.SelectLocationBTN.setEnabled(True)
         elif self.sketchMode:
             if click == QtCore.Qt.LeftButton:
-                self.left_click = True
                 # We use the graphics group to hold all polygon pieces so we dont create a new one if mid process
                 if not self.firstPolygonPoint:
                     self.graphics_group = self.scene.createItemGroup([])
-            elif click == QtCore.Qt.RightButton:
-                self.right_click = True
+
+        if click == QtCore.Qt.LeftButton:
+            self.left_click = True
+        elif click == QtCore.Qt.RightButton:
+            self.right_click = True
 
     def mapMouseMoveEventHandler(self, event):
         if self.sketchMode:
@@ -555,6 +560,11 @@ class SupervisorUI(QtWidgets.QMainWindow):
                         # if it does then remove it from the scene
                         self.scene.removeItem(groups)
                         self.sketchItems.remove(groups)
+        elif self.LocationPicked:
+            if self.right_click:
+                for shape in self.LocationTargetShapes:
+                    if shape.isUnderMouse():
+                        self.removeWaypoint(shape)
 
     def mapMouseReleaseEventHandler(self, event):
         if self.sketchMode:
@@ -615,13 +625,30 @@ class SupervisorUI(QtWidgets.QMainWindow):
 
             else:
                 if event.button() == QtCore.Qt.LeftButton:
-                    self.left_click = False
                     self.sketchItems.append(self.graphics_group)
-                elif event.button() == QtCore.Qt.RightButton:
-                    self.right_click = False
 
             self.last_x = None
             self.last_y = None
+
+        if event.button() == QtCore.Qt.LeftButton:
+            self.left_click = False
+        elif event.button() == QtCore.Qt.RightButton:
+            self.right_click = False
+
+    def removeWaypoint(self, graphicsItem):
+        to_remove = []
+        for idx in range(len(self.NavWaypoints)):
+            if graphicsItem in self.NavWaypoints[idx].target:
+                for circle in self.NavWaypoints[idx].target:
+                    self.scene.removeItem(circle)
+                for line in self.NavWaypoints[idx].arrow:
+                    self.scene.removeItem(line)
+                self.WaypointList.takeItem(self.WaypointList.row(self.NavWaypoints[idx].list_widget))
+                to_remove.append(self.NavWaypoints[idx])
+        for wp in to_remove:
+            self.NavWaypoints.remove(wp)
+        if len(self.NavWaypoints) == 0:
+            self.LocationPicked = False
 
     def create_fill_polygon(self, pen):
         # for all of the ellipses in the graphics group
@@ -695,11 +722,30 @@ class SupervisorUI(QtWidgets.QMainWindow):
             if not self.LocationPicked:
                 self.ErrorLBL.show()
             else:
-                yaw = str(math.radians(self.poseYaw))
-                self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[
-                    self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
-                    self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " + yaw + " " + str(
-                    self.raisePriorityBox.isChecked()))
+                msg = TaskMsg()
+                msg.OGSupervisorID = self.id
+                msg.taskName = self.RobotTasksToCode[self.SelectTaskCB.currentText()]
+                msg.robotName = self.SelectRobot.currentText()
+                # msg.X = self.LocationCoordinates[0]
+                # msg.Y = self.LocationCoordinates[1]
+                # msg.yaw = yaw
+                msg.isRaisedPriority = self.raisePriorityBox.isChecked()
+                extra_waypoints = ''
+                first = True
+                for wp in self.NavWaypoints:
+                    if first:
+                        msg.X = round(wp.X / 100, 3)
+                        msg.Y = -round(wp.Y / 100, 3)
+                        msg.yaw = math.radians(wp.yaw+90)
+                        first = False
+                    else:
+                        extra_waypoints += (wp.toTaskString() + ", ")
+                msg.variables = extra_waypoints
+                self.taskPublisher.publish(msg)
+                # self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[
+                #     self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " + str(
+                #     self.LocationCoordinates[0]) + " " + str(self.LocationCoordinates[1]) + " " + yaw + " " + str(
+                #     self.raisePriorityBox.isChecked()))
                 if self.LocationPicked:
                     for item in self.LocationTargetShapes:
                         self.scene.removeItem(item)
@@ -710,6 +756,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.taskComboBoxChanged()
                 self.raisePriorityBox.setChecked(False)
                 self.SelectRobot.clear()
+                self.WaypointList.clear()
+                self.NavWaypoints.clear()
                 self.SelectRobot.addItem("unassigned")
                 for item in self.SupervisorSpecificRobotNames:
                     self.SelectRobot.addItem(item)
@@ -717,11 +765,26 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.YLocLabel.setText("Y:")
                 self.LocationPicked = False
         else:
-            yaw = str(math.radians(self.poseYaw))
-            self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[
-                self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText() + " " +
-                                       str(self.LocationCoordinates[0]) + " " + str(
-                self.LocationCoordinates[1]) + " " + yaw + " " + str(self.raisePriorityBox.isChecked()))
+            msg = TaskMsg()
+            msg.OGSupervisorID = self.id
+            msg.taskName = self.RobotTasksToCode[self.SelectTaskCB.currentText()]
+            msg.robotName = self.SelectRobot.currentText()
+            # msg.X = self.LocationCoordinates[0]
+            # msg.Y = self.LocationCoordinates[1]
+            # msg.yaw = yaw
+            msg.isRaisedPriority = self.raisePriorityBox.isChecked()
+            extra_waypoints = ''
+            first = True
+            for wp in self.NavWaypoints:
+                if first:
+                    msg.X = round(wp.X / 100, 3)
+                    msg.Y = -round(wp.Y / 100, 3)
+                    msg.yaw = math.radians(wp.yaw+90)
+                    first = False
+                else:
+                    extra_waypoints += (wp.toTaskString() + ", ")
+            msg.variables = extra_waypoints
+            self.taskPublisher.publish(msg)
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
                     self.scene.removeItem(item)
@@ -732,6 +795,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.taskComboBoxChanged()
             self.raisePriorityBox.setChecked(False)
             self.SelectRobot.clear()
+            self.WaypointList.clear()
+            self.NavWaypoints.clear()
             self.SelectRobot.addItem("unassigned")
             for item in self.SupervisorSpecificRobotNames:
                 self.SelectRobot.addItem(item)
@@ -824,6 +889,7 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.drawPoseArrow()
 
     def drawPoseArrow(self):
+        lines = None
         if self.LocationPicked:
             for line in self.poseShapes:
                 self.scene.removeItem(line)
@@ -948,14 +1014,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.PoseDeg.move(self.slideInMenuWidth * 0.80, self.windowHeight * 0.24)
         self.PoseDeg.resize(self.slideInMenuWidth * 0.2, self.windowHeight * 0.04)
 
-        self.WaypointScroll.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.4)
-        self.WaypointScroll.resize(self.slideInMenuWidth*0.9, self.windowHeight * 0.5)
-        self.WaypointScrollContents.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.4)
-        self.WaypointScrollContents.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.5)
-        self.WaypointScroll.setFixedWidth(self.slideInMenuWidth*0.9)
-        self.WaypointScrollContents.setFixedWidth(self.slideInMenuWidth * 0.9)
-        self.WaypointScroll.setAlignment(Qt.AlignHCenter)
-        self.WaypointVBox.setAlignment(Qt.AlignHCenter)
+        self.WaypointList.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.4)
+        self.WaypointList.resize(self.slideInMenuWidth*0.9, self.windowHeight * 0.5)
+        self.WaypointLabel.move(self.slideInMenuWidth *0.4, self.windowHeight*0.37)
 
         self.ConfirmTask.move(self.slideInMenuWidth * 0.05, self.windowHeight * 0.28)
         self.ConfirmTask.resize(self.slideInMenuWidth * 0.9, self.windowHeight * 0.04)
@@ -1027,31 +1088,18 @@ class SideMenuThread(QThread):
 
 
 class NavigationWaypoint:
-    def __init__(self, x, y, yaw, target, arrow, label):
+    def __init__(self, x, y, yaw, target, arrow, text):
 
-        self._X = x
-        self._Y = y
-        self._yaw = yaw
+        self.X = x
+        self.Y = y
+        self.yaw = yaw
         self.target = target
         self.arrow = arrow
-        self.Label = label
-        self.Label.setText("X: " + "{:.2f}".format(self._X / 100) + " Y: " + "{:.2f}".format(
-            -self._Y / 100) + " Yaw: " + str(self._yaw))
+        self.list_widget = text
 
-    def updateX(self, x):
-        self._X = x
-        self.Label.setText("X: " + "{:.2f}".format(self._X / 100) + " Y: " + "{:.2f}".format(
-            -self._Y / 100) + " Yaw: " + str(self._yaw))
-
-    def updateY(self, y):
-        self._Y = y
-        self.Label.setText("X: " + "{:.2f}".format(self._X / 100) + " Y: " + "{:.2f}".format(
-            -self._Y / 100) + " Yaw: " + str(self._yaw))
-
-    def updateYaw(self, yaw):
-        self._yaw = yaw
-        self.Label.setText("X: " + "{:.2f}".format(self._X / 100) + " Y: " + "{:.2f}".format(
-            -self._Y / 100) + " Yaw: " + str(self._yaw))
+    def toTaskString(self):
+        stringy = str(round(self.X / 100, 3)) + " " + str(-round(self.Y / 100, 3)) + " " + str(math.radians(self.yaw+90))
+        return stringy
 
 if __name__ == '__main__':
     nodeID = "supervisorUI_" + str(int(time.time()))
