@@ -39,8 +39,12 @@ import numpy as np
 #  object. Still dont pass the middleman into it if possible
 
 class Middleman():
+
     def __init__(self):
+
         rospy.init_node("middleman", anonymous=True)
+        print("Initializing Middleman Node")
+
         # dictionary for task codes
         """
         Task codes:
@@ -101,14 +105,19 @@ class Middleman():
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
 
-        rospy.sleep(1)
+        #print("A")         # The sleeps hang or some reason
+        #rospy.sleep(1)
+        #print("A")
 
         # publishers
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size=10)
         # self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
-        rospy.sleep(1)
+        
+        #print("A")
+        #rospy.sleep(1)
+        #print("A")
 
         # servers
         self.taskCodeServer = rospy.Service('/supervisor/taskCodes', TaskString, self.sendTaskCodesToSupervisor)
@@ -116,7 +125,7 @@ class Middleman():
         self.mapSubscriber = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
         self.collaborativeSearchSubscriber = rospy.Subscriber('/collab', String, self.guard_searching)
 
-        self.sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border.png")
+        self.sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border_clean.png")
 
         self.searchStarted = False
         self.guardDictionary = {}
@@ -125,6 +134,7 @@ class Middleman():
         self.robot_previous_poses = {}
         self.robot_resend_amt = {}
 
+        print("Initialization Done \n")
 
     # check data length >= 4
     # process task determines which queue to put the task in
@@ -862,9 +872,10 @@ class Middleman():
         if len(self.activeRobotDictionary) > 0:
 
             if not self.searchStarted:
-                items_list = ["scissors", "advil", "bandages", "advil"]
+                items_list = ["scissors", "advil", "bandages"]
                 self.sc.start_search(items_list)
                 self.searchStarted = True
+                #print("SEARCH STARTED")
                 rospy.loginfo("STARTED SEARCH")
 
             # for g in sc.guard_list:
@@ -907,7 +918,6 @@ class Middleman():
                     #     rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
                     #     rospy.loginfo("Robot " + robotName + " task location: " + str(robot.currentTask.X) + ", " + str(robot.currentTask.Y))
 
-
     def transform_realworld_to_map(self, pt, trap_graph_wh):
 
         transformed_pt = []
@@ -933,7 +943,6 @@ class Middleman():
         # transformed_pt = (0, 0)
         return transformed_pt
 
-
     def transform_map_to_realworld(self, pt, trap_graph_wh):
         transformed_pt = []
         res = self.map.info.resolution
@@ -958,11 +967,8 @@ class Middleman():
         # transformed_pt = (0,0)
         return transformed_pt
 
-
     def map_callback(self, msg):
         self.map = msg
-
-
 
 
 middleman = Middleman()
