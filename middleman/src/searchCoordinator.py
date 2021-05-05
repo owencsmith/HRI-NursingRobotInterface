@@ -248,7 +248,7 @@ MAIN
 '''
 
 if __name__ == "__main__":
-    sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border_clean.png",0.3)
+    sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border_clean2.png",0.3)
     sc.draw_guards()
 
     # Start search for scissors

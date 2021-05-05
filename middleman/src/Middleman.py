@@ -125,7 +125,7 @@ class Middleman():
         self.mapSubscriber = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
         self.collaborativeSearchSubscriber = rospy.Subscriber('/collab', String, self.guard_searching)
 
-        self.sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border_clean.png")
+        self.sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border_clean2.png")
 
         self.searchStarted = False
         self.guardDictionary = {}
@@ -813,7 +813,7 @@ class Middleman():
             pass
 
     def checkSearchStatus(self):
-        posTolerance = .2
+        posTolerance = .3
         orientationTolerance = 6.5
         moveTolerance = 0.000005
 
@@ -833,8 +833,7 @@ class Middleman():
 
                 # If the guard was reached
                 if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
-                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and
-                        (abs(robYaw - robot.currentTask.yaw) <= orientationTolerance)):
+                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) ):
                     # if we do via points, instead of IDLE task, send next position in via points list
                     self.setRobotToIdle(robot)
                     self.sc.mark_guard_searched(self.guardDictionary.get(robotName))
