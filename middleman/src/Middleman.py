@@ -837,7 +837,7 @@ class Middleman():
                 # print(str(abs(robYaw - robot.currentTask.yaw)))
                 if robYaw < 0:
                     robYaw = robYaw + 2*np.pi
-                print(str(abs(robYaw - robot.currentTask.yaw))) #+ " " + str(robYaw) + " " + str(robot.currentTask.yaw))
+                # print(str(abs(robYaw - robot.currentTask.yaw))) #+ " " + str(robYaw) + " " + str(robot.currentTask.yaw))
 
                 if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
                         (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) and
@@ -888,7 +888,7 @@ class Middleman():
         :param obstacles: A list of geometry_msg/Polygon in real world coordinates
         :return: A list of 2D points
         """
-        print(obstacles)
+        # print(obstacles)
         transformed_obstacles = []
         for ob in obstacles:
             poly = []
@@ -904,7 +904,7 @@ class Middleman():
                 transformed_pt.append(int(y / res))
                 poly.append(transformed_pt)
             transformed_obstacles.append(poly)
-        print(transformed_obstacles)
+        # print(transformed_obstacles)
         return transformed_obstacles
 
     def augmentMap(self, obstacles):
@@ -935,10 +935,10 @@ class Middleman():
         rospy.wait_for_service('/supervisor/sketchObstacles')
         obstacles_info = self.getSketchedObstacles("Gimme gimme")  # the string sent here doesn't matter at the moment
         # print(obstacles_info)
-        if obstacles_info.updatedSinceLastRequest == 1:
-            print("hi1")
-            if self.occupancy_grid is not None:
-                print("hi2")
+        # if obstacles_info.updatedSinceLastRequest == 1:
+            # print("hi1")
+            # if self.occupancy_grid is not None:
+                # print("hi2")
         if obstacles_info.updatedSinceLastRequest == 1 and self.occupancy_grid is not None:
             #print(obstacles_info)
             transformed_obstacles = self.convertToMapCoordinates(obstacles_info.obstacles)
