@@ -232,6 +232,20 @@ class SearchCoordinator:
         print("SC: no nodes to search for, returning None")
         return None, None
 
+
+    def get_closest_guard(self, robot_pos):
+        closest_guard = None
+        shortest_dist = float('inf')
+        for g in self.guard_list:
+            d = g.get_distance(robot_pos[0], robot_pos[1])
+            # print("guard: " + str(g) + " need searching? " + str(g.needs_searching()))
+            if (d < shortest_dist) and (g.needs_searching()):
+                shortest_dist = d
+                closest_guard = g
+
+        return closest_guard
+
+
     def mark_guard_searched(self, guard, items_found=[]):
 
         #print("SSSSSSSSSSSS")

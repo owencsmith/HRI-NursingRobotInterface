@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import math
 import time
 
 import rospy
@@ -699,7 +700,6 @@ class Middleman():
             except:
                 pass
             robotList.robots.append(robot)
-            # print(type(robot.currentTask.variables))
 
         self.statePublisherForOperator.publish(robotList)
         self.statePublisherForSupervisor.publish(robotList)
@@ -795,8 +795,8 @@ class Middleman():
                 self.reassignmentCounter = time.time()
 
     def checkNavStatus(self):
-        posTolerance = .1
-        orientationTolerance = 0.3
+        posTolerance = .3
+        orientationTolerance = 0.1
         for robot in self.activeRobotDictionary.values():
             if (robot.currentTask.taskName == "NAV"):
                 quat = robot.pose.pose.pose.orientation
@@ -812,9 +812,14 @@ class Middleman():
 
             pass
 
-    def checkSearchStatus(self):
+    def checkSearchStatus(self, search_algorithm):
+
+        if search_algorithm == "guard_searching":
+            guard_searching = True
+        else:
+            guard_searching = False
+
         posTolerance = .3
-        orientationTolerance = 6.5
         moveTolerance = 0.000005
 
         robots = self.activeRobotDictionary.keys()
@@ -829,15 +834,13 @@ class Middleman():
                 robotEuler = euler_from_quaternion(quat_list)
                 robYaw = robotEuler[2]
 
-                #print(robotName + " dist x: " + str(abs(robot.pose.pose.pose.position.x - robot.currentTask.X)) + " dist y: " + str(abs(robot.pose.pose.pose.position.y - robot.currentTask.Y)))
-
                 # If the guard was reached
                 if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
-                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) ):
+                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance)):
                     # if we do via points, instead of IDLE task, send next position in via points list
                     self.setRobotToIdle(robot)
-                    self.sc.mark_guard_searched(self.guardDictionary.get(robotName))
-                    #rospy.logwarn("SETTING " + robotName + " BACK TO IDLE")
+                    if guard_searching:
+                        self.sc.mark_guard_searched(self.guardDictionary.get(robotName))
 
                 elif self.robot_stuck_count.get(robotName) is not None:
                     if self.robot_stuck_count.get(robotName) > 100:
@@ -845,8 +848,8 @@ class Middleman():
                         # TODO: change this to sc.reassign_guard() so that it isn't marked searched
                         #       was only done this way to prevent impossible to reach guards from crashing the system
                         print("MM: Robot %s is stuck, giving up on node" %(str(robotName)))
-                        self.sc.reassign_guard(self.guardDictionary.get(robotName))
-                        #rospy.logwarn("ROBOT " + robotName + " WAS STUCK!!! SETTING BACK TO IDLE")
+                        if guard_searching:
+                            self.sc.reassign_guard(self.guardDictionary.get(robotName))
 
                 if self.robot_previous_poses.get(robotName) is not None:
                     prev_pose = self.robot_previous_poses.get(robotName)
@@ -856,26 +859,102 @@ class Middleman():
                         if self.robot_stuck_count.get(robotName) is not None:
                             count = self.robot_stuck_count.get(robotName)
                             self.robot_stuck_count[robotName] = count+1
-                            #rospy.logwarn(robotName + "current stuck count is " + str(count+1))
                     else:
                         if self.robot_stuck_count.get(robotName) is not None:
                             self.robot_stuck_count[robotName] = 0
-                            #rospy.logwarn(robotName + " current stuck count is 0")
-
-                #rospy.logwarn(robotName + " position is " + str(robot.pose.pose.pose.position.x) + ", " + str(robot.pose.pose.pose.position.y) + ", " + str(robYaw))
 
                 self.robot_previous_poses[robotName] = (robot.pose.pose.pose.position.x, robot.pose.pose.pose.position.y, robYaw)
 
-
             pass
+
+    # def checkSearchStatus_ForceDispersion(self):
+    #     posTolerance = .3
+    #     for robot in self.activeRobotDictionary.values():
+    #         if (robot.currentTask.taskName == "SEARCH"):
+    #             quat = robot.pose.pose.pose.orientation
+    #             quat_list = [quat.x, quat.y, quat.z, quat.w]
+    #             robotEuler = euler_from_quaternion(quat_list)
+    #             robYaw = robotEuler[2]
+    #
+    #             if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
+    #                     (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance)):
+    #                 # if we do via points, instead of IDLE task, send next position in via points list
+    #                 self.setRobotToIdle(robot)
+    #
+    #         pass
+
+    def get_force_vector(self, thisRobotName):
+        robots = self.activeRobotDictionary.keys()
+        thisRobot = self.activeRobotDictionary.get(thisRobotName)
+        force = np.array([[0.0],[0.0]])
+        for robotName in robots:
+            robot = self.activeRobotDictionary.get(robotName)
+            if robotName != thisRobotName:
+                quat = robot.pose.pose.pose.orientation
+                quat_list = [quat.x, quat.y, quat.z, quat.w]
+                robotEuler = euler_from_quaternion(quat_list)
+                robYaw = robotEuler[2]
+
+                dx = thisRobot.pose.pose.pose.position.x - robot.pose.pose.pose.position.x
+                dy = thisRobot.pose.pose.pose.position.y - robot.pose.pose.pose.position.y
+                radius = math.sqrt(dx**2 + dy**2)
+                force += np.array([[float(dx/radius)],[float(dy/radius)]])
+
+        return force
+
+    def get_random_point(self, thisRobotName):
+        thisRobot = self.activeRobotDictionary.get(thisRobotName)
+        return np.array([[thisRobot.pose.pose.pose.position.x+(np.random.uniform(0,1)*(1.0 if np.random.random() < 0.5 else -1.0))],[thisRobot.pose.pose.pose.position.y+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))]])
+
+
+    def classical_searching(self, name):
+
+        sup = list(self.activeSupervisorDictionary.keys())
+        found_tolerance = 3 #set to realsense depth
+        if len(self.activeSupervisorDictionary.values()) != 0:
+
+            if not self.searchStarted:
+                self.items_list = ["scissors", "advil", "bandages"]
+                self.sc.start_search(self.items_list)
+                self.searchStarted = True
+                rospy.loginfo("STARTED SEARCH")
+
+            if len(self.items_list) == 0:
+                rospy.loginfo("SEARCH DONE")
+
+            else:
+                robots = self.activeRobotDictionary.keys()
+                for robotName in robots:
+                    robot = self.activeRobotDictionary.get(robotName)
+                    for item_name in self.items_list:
+                        item_closest_guard = self.sc.item_location_dict.get(item_name)
+                        item = [item_closest_guard.x, item_closest_guard.y]
+                        if abs(item[0]-robot.pose.pose.pose.position.x) < found_tolerance and abs(item[1]-robot.pose.pose.pose.position.y) < found_tolerance:
+                            rospy.loginfo(item_name.upper() + " FOUND")
+                            self.items_list.remove(item_name)
+
+                    if (robot.currentTaskName == "IDLE") and (len(self.activeSupervisorDictionary.values()) != 0):
+
+                        if name == "force_dispersion":
+                            rospy.logwarn("new force for " + robotName)
+                            vector = self.get_force_vector(robotName)
+                        elif name == "random_walk":
+                            rospy.logwarn("new random point for " + robotName)
+                            vector = self.get_random_point(robotName)
+
+                        quat_list = [0, 0, 0, 1]
+                        robotEuler = euler_from_quaternion(quat_list)
+                        yaw = robotEuler[2]
+                        self.searchTask(Task("SEARCH", 0, robotName, vector[0][0], vector[1][0], yaw, False, sup[0]).convertTaskToTaskMsg())
+
 
     def guard_searching(self):
 
         if len(self.activeRobotDictionary) > 0:
 
             if not self.searchStarted:
-                items_list = ["scissors", "advil", "bandages"]
-                self.sc.start_search(items_list)
+                self.items_list = ["scissors", "advil", "bandages"]
+                self.sc.start_search(self.items_list)
                 self.searchStarted = True
                 #print("SEARCH STARTED")
                 rospy.loginfo("STARTED SEARCH")
@@ -979,13 +1058,23 @@ class Middleman():
 
 middleman = Middleman()
 first_time = True
+guard_searching = True
+force_dispersion = False
+random_walk = False
+
 while not rospy.is_shutdown():
     middleman.assignIdleRobots()
     middleman.publishRobotStates()
     middleman.publishRobotsLeftInQueue()
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
-    middleman.checkNavStatus()
-    middleman.checkSearchStatus()
-    middleman.guard_searching()
+    if guard_searching:
+        middleman.checkSearchStatus("guard_searching")
+        middleman.guard_searching()
+    elif force_dispersion:
+        middleman.checkSearchStatus("force_dispersion")
+        middleman.classical_searching("force_dispersion")
+    elif random_walk:
+        middleman.checkSearchStatus("random_walk")
+        middleman.classical_searching("random_walk")
     middleman.rate.sleep()
