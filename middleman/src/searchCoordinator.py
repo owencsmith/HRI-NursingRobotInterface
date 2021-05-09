@@ -134,10 +134,10 @@ class Guard:
         self.y = y
         self.items_to_search_for = []
         self.being_searched = False
-        self.already_searched = False
+        #self.already_searched = False
 
     def needs_searching(self):
-        if (len(self.items_to_search_for) > 0) and (not self.being_searched) and (not self.already_searched):
+        if (len(self.items_to_search_for) > 0) and (not self.being_searched):# and (not self.already_searched):
             return True
         return False
 
@@ -256,9 +256,9 @@ class SearchCoordinator:
                     g.items_to_search_for.remove(item)
 
 
-        # guard.items_to_search_for = []
+        guard.items_to_search_for = []
         guard.being_searched = False
-        guard.already_searched = True
+        #guard.already_searched = True
 
         print("SC: found \"%s\" at node, %d/%d nodes left to search (some may still be in progress)" %(items, self.get_num_nodes_to_search(), len(self.guard_list)))
 
