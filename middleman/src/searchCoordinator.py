@@ -10,6 +10,7 @@ from trapezoidalDecomposition import TrapezoidalDecomposition
 from visibility_map import VisibilityMap
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
+import random
 
 '''
 Miscelaneous Helpers
@@ -170,6 +171,9 @@ class SearchCoordinator:
             self.guard_list.append(Guard(c[1], c[0]))
         self.search_list = []
 
+        # Dictionary to hold item locations
+        self.item_location_dict = {}
+
     def get_width_and_height(self):
         # return self.width, self.height
         return len(self.padded_map), len(self.padded_map[0])
@@ -197,6 +201,10 @@ class SearchCoordinator:
                 for g in self.guard_list:
                     g.items_to_search_for.append(item_id)
                 print("SC: started new search for \"%s\", %d/%d nodes left to search (some may still be in progress)" %(item_id, self.get_num_nodes_to_search(), len(self.guard_list)))
+                print("SC: current search list %s" %(str(self.search_list)))
+                #place the item at a random guard
+                location = random.choice(self.guard_list)
+                self.item_location_dict[item_id] = location
 
             else:
                 print("SC: item \"%s\" already being searched for, not adding again" %(item_id))
@@ -225,18 +233,36 @@ class SearchCoordinator:
         return None, None
 
     def mark_guard_searched(self, guard, items_found=[]):
-        for item in items_found:
+
+        #print("SSSSSSSSSSSS")
+
+        items = []
+        items = items + items_found
+        
+        # this is the temp check for the item at the randomly selected guard
+        for item in self.item_location_dict:
+            if self.item_location_dict[item] == guard:
+                #print("SC: searched a guard with %s at it!" %(item))
+                items.append(item)
+
+        
+        for item in items:
+            #print("SC: current search list: %s" %(str(self.search_list)))
+            #print("SC: item to remove: %s" %(str(item)))
             self.search_list.remove(item)
+            del self.item_location_dict[item]
             for g in self.guard_list:
                 if item in g.items_to_search_for:
                     g.items_to_search_for.remove(item)
+
 
         # guard.items_to_search_for = []
         guard.being_searched = False
         guard.already_searched = True
 
-        print("SC: found \"%s\" at node, %d/%d nodes left to search (some may still be in progress)" %(items_found, self.get_num_nodes_to_search(), len(self.guard_list)))
+        print("SC: found \"%s\" at node, %d/%d nodes left to search (some may still be in progress)" %(items, self.get_num_nodes_to_search(), len(self.guard_list)))
 
+        #print("FFFFFFFFFFFF")
 
     def reassign_guard(self, guard):
         guard.being_searched = False
