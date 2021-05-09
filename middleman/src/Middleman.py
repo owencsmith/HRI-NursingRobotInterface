@@ -15,7 +15,6 @@ from searchCoordinator import *
 import numpy as np
 
 
-
 # Todo: Change initialization of supervisor and operator publisher & subscriber
 
 # Todo: Allocate robots to supervisor based on num robots and num supervisor
@@ -60,6 +59,7 @@ class Middleman():
             'CLN': 50,
             'HLP': 200,
             'DLV': 100,
+            'SEARCH': 125,
             'IDLE': 0
         }
         self.taskFns = {
@@ -67,7 +67,8 @@ class Middleman():
             'CLN': self.clnTask,
             'HLP': self.hlpTask,
             'DLV': self.dlvTask,
-            'IDLE': self.idleTask
+            'IDLE': self.idleTask,
+            'SEARCH': self.searchTask
         }
 
         self.reassignmentCounter = time.time()
@@ -105,19 +106,19 @@ class Middleman():
         rospy.Subscriber("/robot/done_task", String, self.alertSupervisorRobotIsDone)
         rospy.Subscriber("/robot/new_robot_running", String, self.createNewRobot)
 
-        #print("A")         # The sleeps hang or some reason
-        #rospy.sleep(1)
-        #print("A")
+        # print("A")         # The sleeps hang or some reason
+        # rospy.sleep(1)
+        # print("A")
 
         # publishers
         self.statePublisherForSupervisor = rospy.Publisher('/supervisor/robotState', RobotArr, queue_size=10)
         self.robotsLeftInQueue = rospy.Publisher('/operator/robots_left_in_queue', Int32, queue_size=10)
         # self.robotFinishTask = rospy.Publisher('/supervisor/robots_finished_task', String, queue_size=10)
         self.statePublisherForOperator = rospy.Publisher('/operator/robotState', RobotArr, queue_size=10)
-        
-        #print("A")
-        #rospy.sleep(1)
-        #print("A")
+
+        # print("A")
+        # rospy.sleep(1)
+        # print("A")
 
         # servers
         self.taskCodeServer = rospy.Service('/supervisor/taskCodes', TaskString, self.sendTaskCodesToSupervisor)
@@ -157,7 +158,7 @@ class Middleman():
             if (data == ""):
                 return
         else:
-            if(data.data == ""):
+            if (data.data == ""):
                 return
             dataList = data.data.split()
 
@@ -173,18 +174,20 @@ class Middleman():
             priorityRaised = False
         else:
             priorityRaised = True
-        #print('Split Task Data')
-        #print("PRIORITY RAISED: ", priorityRaised)
+        # print('Split Task Data')
+        # print("PRIORITY RAISED: ", priorityRaised)
 
-        # if len(dataList) > 5:
-        #     variables = dataList[5]
-        # else:
-        #     variables = " "
+        if len(dataList) > 7:
+            variables = dataList[7]
+            print(variables)
+        else:
+            variables = ""
 
         if (taskName != 'SOS'):
             X = float(dataList[3])
             Y = float(dataList[4])
-            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised, supervisorID)
+            newTask = Task(taskName, self.taskPrios[taskName], robotName, X, Y, yaw, priorityRaised, supervisorID,
+                           variables)
             newTaskMsg = newTask.convertTaskToTaskMsg()
             if robotName != "unassigned":
                 # remove current task form active task list
@@ -198,7 +201,7 @@ class Middleman():
             else:
                 supervisor.taskPriorityQueue.append(newTask)
                 supervisor.taskPriorityQueue.sort(key=lambda task: task.getPriority())
-            #print('Called Task Function')
+            # print('Called Task Function')
         elif (taskName == 'SOS'):
             self.passRobotToQueueForOperator(robotName)
 
@@ -218,12 +221,14 @@ class Middleman():
         pass
 
     def searchTask(self, taskMsg):
-        #print("Processing Search Goal")
+        # print("Processing Search Goal")
         # parses Robot name XY string and sends to robots movebase
-        currentRobot = self.activeRobotDictionary[taskMsg.robotName]
-        currentRobot.currentTask = taskMsg
-        currentRobot.currentTaskName = taskMsg.taskName
-        self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
+
+        splitvar = taskMsg.variables.split(",")
+        self.sc.start_search(splitvar)
+        # self.searchStarted = True
+        rospy.loginfo("STARTED SEARCH")
+        # self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
 
     def clnTask(self, taskMsg):
         """
@@ -331,18 +336,18 @@ class Middleman():
         # arbitrary orientation for nav goal because operator/automation will take over
         poseStamped.pose.orientation.x = q_orientation[0]
         poseStamped.pose.orientation.y = q_orientation[1]
-        poseStamped.pose.orientation.w = q_orientation[2]
-        poseStamped.pose.orientation.z = q_orientation[3]
+        poseStamped.pose.orientation.w = q_orientation[3]
+        poseStamped.pose.orientation.z = q_orientation[2]
         topic = ''
         if currentRobot.name == 'trina2':
             topic = '/move_base_simple/goal'
         else:
             topic = '/' + currentRobot.name + '/move_base_simple/goal'
-        #print(topic)
+        # print(topic)
         self.goal_publisher = rospy.Publisher(topic, PoseStamped, queue_size=10)
         rospy.sleep(2)
         self.goal_publisher.publish(poseStamped)
-        #print('Publishing Nav Goal')
+        # print('Publishing Nav Goal')
 
     def passRobotToQueueForOperator(self, robotName):
         """
@@ -482,10 +487,11 @@ class Middleman():
         :param req:
         :return:
         """
-        # colors are IDL-grey Nav-green DLV-orange Help-red CLN-blue SOS-red
+        # colors are IDL-grey Nav-green DLV-orange Help-red CLN-blue SOS-red SEARCH-pink
         taskCodeStringList = ['IDLE Idle False #9BA8AB True', 'NAV Navigation True #75D858 True',
                               'DLV Delivery True #B27026 True', 'HLP Help True #A600FF False',
-                              'CLN Clean True #00A2FF True', 'SOS Stuck False #FF0000 True']
+                              'CLN Clean True #00A2FF True', 'SOS Stuck False #FF0000 True',
+                              'SEARCH Search False #FFC0CB True']
         return TaskStringResponse(taskCodeStringList)
 
     # TODO: What does this do??. Nothing cause we have no way of knowing robot is done. (Autonomy not implemented)
@@ -642,7 +648,7 @@ class Middleman():
     # Called when a supervisor unregisters to give other active supervisors the tasks
     def distributeDeadPriorityQueue(self, orphanedPQ):
         # if no supervisors are left dump it into the middleman unsupervised tasks and make all active robots idle
-        if len(self.activeSupervisorDictionary) == 1: # supervisor gets deleted after this function (process task uses supervisor)
+        if len(self.activeSupervisorDictionary) == 1:  # supervisor gets deleted after this function (process task uses supervisor)
             for task in orphanedPQ:
                 task.OGSupervisorID = ''
                 self.unsupervisedTasks.append(task)
@@ -661,7 +667,7 @@ class Middleman():
             return  # just return because the robot should already be Idle
         info_str = robot.supervisorID + ' ' + 'IDLE' + ' ' + robot.name + ' ' + '0' + ' ' + '0' + ' ' + '0' + ' ' + 'False' + ' '
         self.robot_stuck_count[robot.name] = 0
-        #print("Setting Robot " + str(robot.name) + " count to 0")
+        # print("Setting Robot " + str(robot.name) + " count to 0")
         self.processTask(info_str)
 
     def findOperatorFromRobot(self, robot):
@@ -711,7 +717,7 @@ class Middleman():
         """
         for robot in self.activeRobotDictionary.values():
             # check for IDLE robots
-            if robot.currentTaskName == "IDLE":
+            if robot.currentTaskName == "IDLE" and len(self.sc.search_list) == 0:
                 if (self.activeRobotDictionary[robot.name].supervisorID != ""):
                     supervisor = self.activeSupervisorDictionary[self.activeRobotDictionary[robot.name].supervisorID]
                     if len(supervisor.taskPriorityQueue) > 0:
@@ -768,7 +774,7 @@ class Middleman():
                 lowestPriorityTask = supervisor.activeTaskList[0]
                 if (lowestPriorityTask.taskName != "IDLE"):
                     if highestPriorityTask.getPriority() > lowestPriorityTask.getPriority():
-                        #print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(highestPriorityTask.getPriority()))
+                        # print("Reassigning Task " + str(highestPriorityTask.taskName) + ": " + str(highestPriorityTask.getPriority()))
                         swappedTasks = TaskMsgArr()
                         # swap the active task with high  [Active, High Priority]
                         swappedTasks.taskMsgs.append(lowestPriorityTask.convertTaskToTaskMsg())
@@ -829,24 +835,24 @@ class Middleman():
                 robotEuler = euler_from_quaternion(quat_list)
                 robYaw = robotEuler[2]
 
-                #print(robotName + " dist x: " + str(abs(robot.pose.pose.pose.position.x - robot.currentTask.X)) + " dist y: " + str(abs(robot.pose.pose.pose.position.y - robot.currentTask.Y)))
+                # print(robotName + " dist x: " + str(abs(robot.pose.pose.pose.position.x - robot.currentTask.X)) + " dist y: " + str(abs(robot.pose.pose.pose.position.y - robot.currentTask.Y)))
 
                 # If the guard was reached
                 if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
-                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance) ):
+                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance)):
                     # if we do via points, instead of IDLE task, send next position in via points list
                     self.setRobotToIdle(robot)
                     self.sc.mark_guard_searched(self.guardDictionary.get(robotName))
-                    #rospy.logwarn("SETTING " + robotName + " BACK TO IDLE")
+                    # rospy.logwarn("SETTING " + robotName + " BACK TO IDLE")
 
                 elif self.robot_stuck_count.get(robotName) is not None:
                     if self.robot_stuck_count.get(robotName) > 100:
                         self.setRobotToIdle(robot)
                         # TODO: change this to sc.reassign_guard() so that it isn't marked searched
                         #       was only done this way to prevent impossible to reach guards from crashing the system
-                        print("MM: Robot %s is stuck, giving up on node" %(str(robotName)))
+                        print("MM: Robot %s is stuck, giving up on node" % (str(robotName)))
                         self.sc.reassign_guard(self.guardDictionary.get(robotName))
-                        #rospy.logwarn("ROBOT " + robotName + " WAS STUCK!!! SETTING BACK TO IDLE")
+                        # rospy.logwarn("ROBOT " + robotName + " WAS STUCK!!! SETTING BACK TO IDLE")
 
                 if self.robot_previous_poses.get(robotName) is not None:
                     prev_pose = self.robot_previous_poses.get(robotName)
@@ -855,30 +861,23 @@ class Middleman():
                             (abs(robYaw - prev_pose[2]) <= moveTolerance)):
                         if self.robot_stuck_count.get(robotName) is not None:
                             count = self.robot_stuck_count.get(robotName)
-                            self.robot_stuck_count[robotName] = count+1
-                            #rospy.logwarn(robotName + "current stuck count is " + str(count+1))
+                            self.robot_stuck_count[robotName] = count + 1
+                            # rospy.logwarn(robotName + "current stuck count is " + str(count+1))
                     else:
                         if self.robot_stuck_count.get(robotName) is not None:
                             self.robot_stuck_count[robotName] = 0
-                            #rospy.logwarn(robotName + " current stuck count is 0")
+                            # rospy.logwarn(robotName + " current stuck count is 0")
 
-                #rospy.logwarn(robotName + " position is " + str(robot.pose.pose.pose.position.x) + ", " + str(robot.pose.pose.pose.position.y) + ", " + str(robYaw))
+                # rospy.logwarn(robotName + " position is " + str(robot.pose.pose.pose.position.x) + ", " + str(robot.pose.pose.pose.position.y) + ", " + str(robYaw))
 
-                self.robot_previous_poses[robotName] = (robot.pose.pose.pose.position.x, robot.pose.pose.pose.position.y, robYaw)
-
+                self.robot_previous_poses[robotName] = (
+                robot.pose.pose.pose.position.x, robot.pose.pose.pose.position.y, robYaw)
 
             pass
 
     def guard_searching(self):
 
         if len(self.activeRobotDictionary) > 0:
-
-            if not self.searchStarted:
-                items_list = ["scissors", "advil", "bandages"]
-                self.sc.start_search(items_list)
-                self.searchStarted = True
-                #print("SEARCH STARTED")
-                rospy.loginfo("STARTED SEARCH")
 
             # for g in sc.guard_list:
             #     print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
@@ -890,7 +889,8 @@ class Middleman():
             for robotName in robots:
                 robot = self.activeRobotDictionary.get(robotName)
 
-                if (robot.currentTaskName == "IDLE") and (len(self.activeSupervisorDictionary.values()) != 0) and (self.sc.get_num_nodes_to_search() > 0):
+                if (robot.currentTaskName == "IDLE") and (len(self.activeSupervisorDictionary.values()) != 0) and (
+                        self.sc.get_num_nodes_to_search() > 0):
                     x = robot.pose.pose.pose.position.x
                     y = robot.pose.pose.pose.position.y
                     quat = robot.pose.pose.pose.orientation
@@ -901,24 +901,28 @@ class Middleman():
                     if x != 0 and y != 0:
                         sup = list(self.activeSupervisorDictionary.keys())
 
-                        print("MM: Robot %s is no longer idle, sending to guard" %(str(robotName)))
+                        print("MM: Robot %s is no longer idle, sending to guard" % (str(robotName)))
 
-                        #rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
-                        pt_to_search = self.transform_realworld_to_map((x,y),wh)
-                        #rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
+                        # rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
+                        pt_to_search = self.transform_realworld_to_map((x, y), wh)
+                        # rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
-                        a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0],pt_to_search[1]))
+                        a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0], pt_to_search[1]))
 
                         if a_guard is None:
-                            print("MM: got no node, setting robot %s to idle" %(str(robotName)))
+                            print("MM: got no node, setting robot %s to idle" % (str(robotName)))
                             self.setRobotToIdle(robotName)
-                            
+
                         else:
                             # rospy.logwarn("guard: " + str(guard_position))
                             self.guardDictionary[robotName] = a_guard
-                            map_pt = self.transform_map_to_realworld((guard_position[0],guard_position[1]),wh)
+                            map_pt = self.transform_map_to_realworld((guard_position[0], guard_position[1]), wh)
                             # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
-                            self.searchTask(Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False, sup[0]).convertTaskToTaskMsg())
+                            taskMsg = Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False,
+                                           sup[0]).convertTaskToTaskMsg()
+                            robot.currentTask = taskMsg
+                            robot.currentTaskName = taskMsg.taskName
+                            self.sendRobotToPos(robot, map_pt[0], map_pt[1], yaw)
 
                     # else:
                     #     rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
@@ -936,8 +940,8 @@ class Middleman():
         map_height = float(self.map.info.height)
         # print(map_width)
         # print(trap_graph_width)
-        translated_x = (pt[0] - origin_x)/res
-        translated_y = -(pt[1] - origin_y)/res + map_height
+        translated_x = (pt[0] - origin_x) / res
+        translated_y = -(pt[1] - origin_y) / res + map_height
         # rospy.logwarn("intermediate point is " + str([translated_x, translated_y]))
         scaled_x = translated_x * (trap_graph_width / map_width)
         scaled_y = translated_y * (trap_graph_height / map_height)
@@ -959,15 +963,14 @@ class Middleman():
         map_width = float(self.map.info.width)
         map_height = float(self.map.info.height)
 
-        scaled_x = pt[0]*(map_width/trap_graph_width)
-        scaled_y = pt[1]*(map_height/trap_graph_height)
+        scaled_x = pt[0] * (map_width / trap_graph_width)
+        scaled_y = pt[1] * (map_height / trap_graph_height)
         # scaled_y = pt[1]-map_height*(map_height/trap_graph_height)
 
         # transformed_pt.append(scaled_x*res + origin_x)
         # transformed_pt.append(-(scaled_y*res + origin_y))
-        transformed_pt.append(scaled_x*res + origin_x)
-        transformed_pt.append(-(scaled_y-map_height)*res + origin_y)
-
+        transformed_pt.append(scaled_x * res + origin_x)
+        transformed_pt.append(-(scaled_y - map_height) * res + origin_y)
 
         # rospy.logwarn("transformed point guard to world is: " + str(transformed_pt))
         # transformed_pt = (0,0)

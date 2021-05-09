@@ -235,6 +235,16 @@
       <string>0 Deg</string>
      </property>
     </widget>
+    <widget class="QTextEdit" name="SearchItemTextEdit">
+     <property name="geometry">
+      <rect>
+       <x>60</x>
+       <y>620</y>
+       <width>104</width>
+       <height>70</height>
+      </rect>
+     </property>
+    </widget>
    </widget>
    <widget class="QPushButton" name="CreateTaskButton">
     <property name="geometry">

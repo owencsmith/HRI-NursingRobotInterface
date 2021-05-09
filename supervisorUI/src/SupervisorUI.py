@@ -194,14 +194,14 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 shape.setBrush(QBrush(self.gray, Qt.SolidPattern))
                 shape.setRotation(item["rotation"])
                 self.ObstacleList.append(shape)
-            elif (item["type"]=="plant"):
-                shape = QGraphicsEllipseItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
-                                          item["length"], item["width"])
-                shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
-                shape.setPen(QPen(self.green))
-                shape.setBrush(QBrush(self.green, Qt.SolidPattern))
-                shape.setRotation(item["rotation"])
-                self.ObstacleList.append(shape)
+            # elif (item["type"]=="plant"):
+            #     shape = QGraphicsEllipseItem(item["centerX"] - item["length"] / 2, -item["centerY"] - item["width"] / 2,
+            #                               item["length"], item["width"])
+            #     shape.setTransformOriginPoint(QPoint(item["centerX"], -item["centerY"]))
+            #     shape.setPen(QPen(self.green))
+            #     shape.setBrush(QBrush(self.green, Qt.SolidPattern))
+            #     shape.setRotation(item["rotation"])
+            #     self.ObstacleList.append(shape)
         self.SupervisorMap.scale(self.scaleFactor, self.scaleFactor)
 
     def wheelEvent(self, event):
@@ -356,8 +356,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
             taskInfo = item.split()
             self.RobotTasks[taskInfo[0]] = (taskInfo[1], taskInfo[2], taskInfo[3])
             self.RobotTasksToCode[taskInfo[1]] = taskInfo[0]
-        self.RobotTasks['SEARCH'] = ['Search', 'False', '#FFC0CB']
-        self.RobotTasksToCode['Search'] = 'SEARCH'
+        # self.RobotTasks['SEARCH'] = ['Search', 'False', '#FFC0CB']
+        # self.RobotTasksToCode['Search'] = 'SEARCH'
 
 
     def populateTaskComboBox(self):
@@ -472,8 +472,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
                 self.LocationPicked = False
         else:
             yaw = str(math.radians(self.poseYaw))
-            self.taskPublisher.publish(self.id + " " + self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " +
-                                       str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) + " " + yaw + " " + str(self.raisePriorityBox.isChecked()))
+            taskstr = self.id + " " + self.RobotTasksToCode[self.SelectTaskCB.currentText()] + " " + self.SelectRobot.currentText()+ " " +   str(self.LocationCoordinates[0])+ " "+ str(self.LocationCoordinates[1]) + " " + yaw + " " + str(self.raisePriorityBox.isChecked())
+            if "SEARCH" == self.RobotTasksToCode[self.SelectTaskCB.currentText()]:
+                taskstr += " " + self.SearchItemTextEdit.toPlainText()
+            self.taskPublisher.publish(taskstr)
             if self.LocationPicked:
                 for item in self.LocationTargetShapes:
                     self.scene.removeItem(item)
@@ -509,7 +511,8 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.ErrorLBL.hide()
         for item in self.LocationTargetShapes:
             self.scene.removeItem(item)
-        if(self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]][1]=="True"):
+        selectedTask = self.RobotTasks[self.RobotTasksToCode[self.SelectTaskCB.currentText()]]
+        if(selectedTask[1]=="True"):
             self.SelectLocationBTN.setEnabled(True)
         else:
             self.SelectLocationBTN.setEnabled(False)
@@ -517,6 +520,10 @@ class SupervisorUI(QtWidgets.QMainWindow):
             self.XLocLabel.setText("X: ")
             self.YLocLabel.setText("Y: ")
             self.LocationPicked = False
+        if selectedTask == self.RobotTasks['SEARCH']:
+            self.SearchItemTextEdit.show()
+        else:
+            self.SearchItemTextEdit.hide()
 
     def obstacleComboBoxChanged(self):
         if self.ToggleObstaclesCB.isChecked():
@@ -633,6 +640,9 @@ class SupervisorUI(QtWidgets.QMainWindow):
         self.PoseSlider.resize(self.slideInMenuWidth*0.7, self.windowHeight*0.04)
         self.PoseDeg.move(self.slideInMenuWidth*0.80, self.windowHeight*0.24)
         self.PoseDeg.resize(self.slideInMenuWidth*0.2, self.windowHeight*0.04)
+
+        self.SearchItemTextEdit.move(self.slideInMenuWidth*0.05, self.windowHeight*0.35)
+        self.SearchItemTextEdit.resize(self.slideInMenuWidth*0.8, self.windowHeight*0.04)
 
         self.ConfirmTask.move(self.slideInMenuWidth*0.05, self.windowHeight*0.28)
         self.ConfirmTask.resize(self.slideInMenuWidth*0.9, self.windowHeight*0.04)
