@@ -848,6 +848,7 @@ class Middleman():
                 elif self.robot_stuck_count.get(robotName) is not None:
                     if self.robot_stuck_count.get(robotName) > 100:
                         self.setRobotToIdle(robot)
+
                         # TODO: change this to sc.reassign_guard() so that it isn't marked searched
                         #       was only done this way to prevent impossible to reach guards from crashing the system
                         print("MM: Robot %s is stuck, giving up on node" % (str(robotName)))
@@ -898,35 +899,41 @@ class Middleman():
                     robotEuler = euler_from_quaternion(quat_list)
                     yaw = robotEuler[2]
 
-                    if x != 0 and y != 0:
-                        sup = list(self.activeSupervisorDictionary.keys())
+                    #if x != 0 and y != 0:
+                    sup = list(self.activeSupervisorDictionary.keys())
 
-                        print("MM: Robot %s is no longer idle, sending to guard" % (str(robotName)))
+                    print("MM: Robot %s is no longer idle, sending to guard" % (str(robotName)))
 
-                        # rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
-                        pt_to_search = self.transform_realworld_to_map((x, y), wh)
-                        # rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
+                    # rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
+                    pt_to_search = self.transform_realworld_to_map((x, y), wh)
+                    # rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
-                        a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0], pt_to_search[1]))
+                    a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0], pt_to_search[1]))
 
-                        if a_guard is None:
-                            print("MM: got no node, setting robot %s to idle" % (str(robotName)))
-                            self.setRobotToIdle(robotName)
+                    if a_guard is None:
+                        print("MM: got no node, setting robot %s to idle" % (str(robotName)))
+                        self.setRobotToIdle(robot)
 
-                        else:
-                            # rospy.logwarn("guard: " + str(guard_position))
-                            self.guardDictionary[robotName] = a_guard
-                            map_pt = self.transform_map_to_realworld((guard_position[0], guard_position[1]), wh)
-                            # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
-                            taskMsg = Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False,
-                                           sup[0]).convertTaskToTaskMsg()
-                            robot.currentTask = taskMsg
-                            robot.currentTaskName = taskMsg.taskName
-                            self.sendRobotToPos(robot, map_pt[0], map_pt[1], yaw)
+                    else:
+                        # rospy.logwarn("guard: " + str(guard_position))
+                        self.guardDictionary[robotName] = a_guard
+                        map_pt = self.transform_map_to_realworld((guard_position[0], guard_position[1]), wh)
+                        # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
+                        taskMsg = Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False,
+                                        sup[0]).convertTaskToTaskMsg()
+                        robot.currentTask = taskMsg
+                        robot.currentTaskName = taskMsg.taskName
+                        self.sendRobotToPos(robot, map_pt[0], map_pt[1], yaw)
 
                     # else:
                     #     rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
                     #     rospy.loginfo("Robot " + robotName + " task location: " + str(robot.currentTask.X) + ", " + str(robot.currentTask.Y))
+
+                # Lets hope it never has a guard at 0,0
+                if (robot.currentTaskName == "SEARCH") and (robot.currentTask.X == 0) and (robot.currentTask.Y == 0):
+                    self.setRobotToIdle(robot)
+                #if (robot.currentTaskName == "IDLE") and (robot.currentTask.X == 0) and (robot.currentTask.Y == 0):
+                #    self.setRobotToIdle(robot)
 
     def transform_realworld_to_map(self, pt, trap_graph_wh):
 

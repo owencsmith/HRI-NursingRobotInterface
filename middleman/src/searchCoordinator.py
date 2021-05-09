@@ -134,10 +134,9 @@ class Guard:
         self.y = y
         self.items_to_search_for = []
         self.being_searched = False
-        #self.already_searched = False
 
     def needs_searching(self):
-        if (len(self.items_to_search_for) > 0) and (not self.being_searched):# and (not self.already_searched):
+        if (len(self.items_to_search_for) > 0) and (not self.being_searched):
             return True
         return False
 
@@ -234,21 +233,16 @@ class SearchCoordinator:
 
     def mark_guard_searched(self, guard, items_found=[]):
 
-        #print("SSSSSSSSSSSS")
-
         items = []
         items = items + items_found
         
         # this is the temp check for the item at the randomly selected guard
         for item in self.item_location_dict:
             if self.item_location_dict[item] == guard:
-                #print("SC: searched a guard with %s at it!" %(item))
                 items.append(item)
 
         
         for item in items:
-            #print("SC: current search list: %s" %(str(self.search_list)))
-            #print("SC: item to remove: %s" %(str(item)))
             self.search_list.remove(item)
             del self.item_location_dict[item]
             for g in self.guard_list:
@@ -258,11 +252,8 @@ class SearchCoordinator:
 
         guard.items_to_search_for = []
         guard.being_searched = False
-        #guard.already_searched = True
 
         print("SC: found \"%s\" at node, %d/%d nodes left to search (some may still be in progress)" %(items, self.get_num_nodes_to_search(), len(self.guard_list)))
-
-        #print("FFFFFFFFFFFF")
 
     def reassign_guard(self, guard):
         guard.being_searched = False
@@ -270,7 +261,7 @@ class SearchCoordinator:
         
 
 '''
-MAIN
+MAIN - for testing, not ROS 
 '''
 
 if __name__ == "__main__":
