@@ -879,21 +879,6 @@ class Middleman():
 
             pass
 
-    # def checkSearchStatus_ForceDispersion(self):
-    #     posTolerance = .3
-    #     for robot in self.activeRobotDictionary.values():
-    #         if (robot.currentTask.taskName == "SEARCH"):
-    #             quat = robot.pose.pose.pose.orientation
-    #             quat_list = [quat.x, quat.y, quat.z, quat.w]
-    #             robotEuler = euler_from_quaternion(quat_list)
-    #             robYaw = robotEuler[2]
-    #
-    #             if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
-    #                     (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance)):
-    #                 # if we do via points, instead of IDLE task, send next position in via points list
-    #                 self.setRobotToIdle(robot)
-    #
-    #         pass
 
     def get_force_vector(self, thisRobotName):
         robots = self.activeRobotDictionary.keys()
@@ -909,15 +894,70 @@ class Middleman():
 
                 dx = thisRobot.pose.pose.pose.position.x - robot.pose.pose.pose.position.x
                 dy = thisRobot.pose.pose.pose.position.y - robot.pose.pose.pose.position.y
-                radius = math.sqrt(dx**2 + dy**2)
-                force += np.array([[float(dx/radius)],[float(dy/radius)]])
+                robots_theta = math.atan2(dy, dx)
+                radius = math.sqrt(dx**2+dy**2)
 
-        return force
+                force += np.array([[math.cos(robots_theta)],[math.sin(robots_theta)]])*float(1/radius)
+
+        scale = 10
+        force = force*scale
+        new_pose = np.array([[thisRobot.pose.pose.pose.position.x + force[0][0]],[thisRobot.pose.pose.pose.position.y+force[1][0]]])
+        # print(new_pose)
+
+        # res = self.map.info.resolution
+        # hi_x = abs(self.map.info.origin.position.x)
+        # hi_y = abs(self.map.info.origin.position.y)
+        #
+        # x = (np.interp(new_pose[0][0], [-hi_x, hi_x], [0, (hi_x * 2)])) / res
+        # y = (np.interp(new_pose[1][0], [-hi_y, hi_y], [0, (hi_y * 2)])) / res
+        # map_coords = int(y *self.map.info.width +x)
+        # map_coords = int(new_pose[1][0] * self.map.info.width + new_pose[0][0])
+        map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
+        # print(map_coords)
+
+        # map_coords = int(((new_pose[1][0] + self.map.info.origin.position.y)*(1/res))*self.map.info.width + (new_pose[0][0] + self.map.info.origin.position.x)*(1/res))
+
+        if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
+            rospy.logwarn("force in obstacle or unknown")
+            reduced_force = force/10
+            for i in range(10):
+                incremental_force = reduced_force*i
+                new_pose = np.array([[thisRobot.pose.pose.pose.position.x + incremental_force[0][0]],
+                                     [thisRobot.pose.pose.pose.position.y + incremental_force[1][0]]])
+                # map_coords = int(new_pose[1][0] * self.map.info.width + new_pose[0][0])
+                map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
+                if self.map.data[map_coords] == 0:
+                    return new_pose
+            rospy.logwarn("could not find incremental force point that wasnt in obstacle")
+        else:
+            rospy.logwarn("force sending to open cell")
+
+        return new_pose
+
+
+    def point_to_index(self, loc):
+
+        res = self.map.info.resolution
+        Xorigin = self.map.info.origin.position.x
+        Yorigin = self.map.info.origin.position.y
+
+        Xcell = int((loc[0] - Xorigin - (res / 2)) / res)
+        Ycell = int((loc[1] - Yorigin - (res / 2)) / res)
+
+        return Ycell*self.map.info.width + Xcell
+
 
     def get_random_point(self, thisRobotName):
         thisRobot = self.activeRobotDictionary.get(thisRobotName)
-        return np.array([[thisRobot.pose.pose.pose.position.x+(np.random.uniform(0,1)*(1.0 if np.random.random() < 0.5 else -1.0))],[thisRobot.pose.pose.pose.position.y+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))]])
 
+        new_pose = np.array([[thisRobot.pose.pose.pose.position.x+(np.random.uniform(0,1)*(1.0 if np.random.random() < 0.5 else -1.0))],[thisRobot.pose.pose.pose.position.y+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))]])
+
+        res = self.map.info.resolution
+        map_coords = (new_pose * res).astype(int)
+        if self.map.data[int(map_coords[1][0]*self.map.info.width+map_coords[0][0])] == -1 or self.map.data[int(map_coords[1][0]*self.map.info.width+map_coords[0][0])] == 100:
+            return self.get_random_point(self, thisRobotName)
+        else:
+            return new_pose
 
     def classical_searching(self, name):
 
@@ -930,6 +970,7 @@ class Middleman():
                 self.sc.start_search(self.items_list)
                 self.searchStarted = True
                 rospy.loginfo("STARTED SEARCH")
+                print(str(self.searchStarted))
 
             if len(self.items_list) == 0:
                 rospy.loginfo("SEARCH DONE")
@@ -949,27 +990,24 @@ class Middleman():
 
                         if name == "force_dispersion":
                             rospy.logwarn("new force for " + robotName)
-                            vector = self.get_force_vector(robotName)
+                            new_position = self.get_force_vector(robotName)
                         elif name == "random_walk":
                             rospy.logwarn("new random point for " + robotName)
-                            vector = self.get_random_point(robotName)
+                            new_position = self.get_random_point(robotName)
 
                         quat_list = [0, 0, 0, 1]
                         robotEuler = euler_from_quaternion(quat_list)
                         yaw = robotEuler[2]
-                        self.searchTask(Task("SEARCH", 0, robotName, vector[0][0], vector[1][0], yaw, False, sup[0]).convertTaskToTaskMsg())
+                        taskMsg = Task("SEARCH", 0, robotName, new_position[0][0], new_position[1][0], yaw, False,
+                                       sup[0]).convertTaskToTaskMsg()
+                        robot.currentTask = taskMsg
+                        robot.currentTaskName = taskMsg.taskName
+                        self.sendRobotToPos(robot,  new_position[0][0], new_position[1][0], yaw)
 
 
     def guard_searching(self):
 
         if len(self.activeRobotDictionary) > 0:
-
-            # if not self.searchStarted:
-            #     self.items_list = ["scissors", "advil", "bandages"]
-            #     self.sc.start_search(self.items_list)
-            #     self.searchStarted = True
-            #     #print("SEARCH STARTED")
-            #     rospy.loginfo("STARTED SEARCH")
 
             # for g in sc.guard_list:
             #     print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
@@ -1074,8 +1112,8 @@ class Middleman():
 
 middleman = Middleman()
 first_time = True
-guard_searching = True
-force_dispersion = False
+guard_searching = False
+force_dispersion = True
 random_walk = False
 
 while not rospy.is_shutdown():
