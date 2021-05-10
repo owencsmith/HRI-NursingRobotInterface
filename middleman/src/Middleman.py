@@ -964,9 +964,8 @@ class Middleman():
     def get_random_point(self, thisRobotName):
         thisRobot = self.activeRobotDictionary.get(thisRobotName)
 
-        new_pose = np.array([[thisRobot.pose.pose.pose.position.x+(np.random.uniform(0,1)*(1.0 if np.random.random() < 0.5 else -1.0))],[thisRobot.pose.pose.pose.position.y+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))]])
+        new_pose = np.array([[thisRobot.pose.pose.pose.position.x+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))],[thisRobot.pose.pose.pose.position.y+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))]])
 
-        res = self.map.info.resolution
         map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
         if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
             print("finding another random point - previous was unknown or occupied")
@@ -1000,6 +999,12 @@ class Middleman():
                 self.searchStarted = True
                 rospy.loginfo("STARTED SEARCH")
                 print(str(self.searchStarted))
+                self.item_list_world_coords = {}
+                for item_name in self.items_list:
+                    item_closest_guard = self.sc.item_location_dict.get(item_name)
+                    item = self.transform_map_to_realworld((item_closest_guard.x, item_closest_guard.y),
+                                                           self.sc.get_width_and_height())
+                    self.item_list_world_coords[item_name] = item
 
             if len(self.items_list) == 0:
                 rospy.loginfo("SEARCH DONE")
@@ -1009,8 +1014,7 @@ class Middleman():
                 for robotName in robots:
                     robot = self.activeRobotDictionary.get(robotName)
                     for item_name in self.items_list:
-                        item_closest_guard = self.sc.item_location_dict.get(item_name)
-                        item = [item_closest_guard.x, item_closest_guard.y]
+                        item = self.item_list_world_coords.get(item_name)
                         if abs(item[0]-robot.pose.pose.pose.position.x) < found_tolerance and abs(item[1]-robot.pose.pose.pose.position.y) < found_tolerance:
                             rospy.loginfo(item_name.upper() + " FOUND")
                             self.items_list.remove(item_name)
