@@ -970,7 +970,7 @@ class Middleman():
         map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
         if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
             print("finding another random point - previous was unknown or occupied")
-            return self.get_random_point(self, thisRobotName)
+            return self.get_random_point(thisRobotName)
         else:
             return new_pose
 
