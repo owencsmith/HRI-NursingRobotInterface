@@ -948,6 +948,7 @@ class Middleman():
 
         return new_pose
 
+
     def point_to_index(self, loc):
 
         res = self.map.info.resolution
@@ -959,17 +960,20 @@ class Middleman():
 
         return Ycell*self.map.info.width + Xcell
 
+
     def get_random_point(self, thisRobotName):
         thisRobot = self.activeRobotDictionary.get(thisRobotName)
 
         new_pose = np.array([[thisRobot.pose.pose.pose.position.x+(np.random.uniform(0,1)*(1.0 if np.random.random() < 0.5 else -1.0))],[thisRobot.pose.pose.pose.position.y+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))]])
 
         res = self.map.info.resolution
-        map_coords = (new_pose * res).astype(int)
-        if self.map.data[int(map_coords[1][0]*self.map.info.width+map_coords[0][0])] == -1 or self.map.data[int(map_coords[1][0]*self.map.info.width+map_coords[0][0])] == 100:
+        map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
+        if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
+            print("finding another random point - previous was unknown or occupied")
             return self.get_random_point(self, thisRobotName)
         else:
             return new_pose
+
 
     def do_searching(self):
         if   (self.search_algorithm == 0): # Guard searching
@@ -1143,7 +1147,7 @@ Parameters for coordinated search
  2 = force dispersion
  3 = random walk
 '''
-search_mode = 0
+search_mode = 3
 
 middleman = Middleman(search_mode)
 
