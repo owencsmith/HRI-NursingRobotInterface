@@ -968,7 +968,7 @@ class Middleman():
 
         map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
         if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
-            print("finding another random point - previous was unknown or occupied")
+            # print("finding another random point - previous was unknown or occupied")
             return self.get_random_point(thisRobotName)
         else:
             return new_pose
@@ -997,7 +997,7 @@ class Middleman():
                 self.items_list = ["scissors", "advil", "bandages"]
                 self.sc.start_search(self.items_list)
                 self.searchStarted = True
-                rospy.loginfo("STARTED SEARCH")
+                print("STARTED SEARCH")
                 print(str(self.searchStarted))
                 self.item_list_world_coords = {}
                 for item_name in self.items_list:
@@ -1005,6 +1005,7 @@ class Middleman():
                     item = self.transform_map_to_realworld((item_closest_guard.x, item_closest_guard.y),
                                                            self.sc.get_width_and_height())
                     self.item_list_world_coords[item_name] = item
+                    print(item_name + " position is " + str(item))
 
             if len(self.items_list) == 0:
                 rospy.loginfo("SEARCH DONE")
@@ -1016,16 +1017,16 @@ class Middleman():
                     for item_name in self.items_list:
                         item = self.item_list_world_coords.get(item_name)
                         if abs(item[0]-robot.pose.pose.pose.position.x) < found_tolerance and abs(item[1]-robot.pose.pose.pose.position.y) < found_tolerance:
-                            rospy.loginfo(item_name.upper() + " FOUND")
+                            print("MML " + item_name.upper() + " FOUND")
                             self.items_list.remove(item_name)
 
                     if (robot.currentTaskName == "IDLE") and (len(self.activeSupervisorDictionary.values()) != 0):
 
                         if name == "force_dispersion":
-                            rospy.logwarn("new force for " + robotName)
+                            print("MM: new force for " + robotName)
                             new_position = self.get_force_vector(robotName)
                         elif name == "random_walk":
-                            rospy.logwarn("new random point for " + robotName)
+                            print("MM: new random point for " + robotName)
                             new_position = self.get_random_point(robotName)
 
                         quat_list = [0, 0, 0, 1]
