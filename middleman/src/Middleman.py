@@ -129,7 +129,8 @@ class Middleman():
         self.mapSubscriber = rospy.Subscriber('/map', OccupancyGrid, self.map_callback)
         self.collaborativeSearchSubscriber = rospy.Subscriber('/collab', String, self.guard_searching)
 
-        self.sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border_clean2.png")
+        c = (self.search_algorithm==1)
+        self.sc = SearchCoordinator("HospitalMapCleaned_filledin_black_border_clean2.png", cluster=c)
 
         self.searchStarted = False
         self.guardDictionary = {}
@@ -228,7 +229,20 @@ class Middleman():
         # parses Robot name XY string and sends to robots movebase
 
         splitvar = taskMsg.variables.split(",")
-        self.sc.start_search(splitvar)
+
+        wh = self.sc.get_width_and_height()
+        robots = self.activeRobotDictionary.keys()
+        print("MM: creating robot dict for SC")
+        robot_dict_for_sc = {}
+        for robot in robots:
+            print(robot)
+            x = self.activeRobotDictionary[robot].pose.pose.pose.position.x
+            y = self.activeRobotDictionary[robot].pose.pose.pose.position.y
+            robot_pt = self.transform_realworld_to_map((x,y),wh)
+            robot_dict_for_sc[robot] = robot_pt
+        print(robot_dict_for_sc)
+
+        self.sc.start_search(splitvar, robot_dict=robot_dict_for_sc)
         # self.searchStarted = True
         rospy.loginfo("STARTED SEARCH")
         # self.sendRobotToPos(currentRobot, float(taskMsg.X), float(taskMsg.Y), float(taskMsg.yaw))
@@ -823,6 +837,7 @@ class Middleman():
     def checkSearchStatus(self):
 
         guard_searching = (self.search_algorithm==0)
+        guard_clustering = (self.search_algorithm==1)
 
         posTolerance = .3
         moveTolerance = 0.000005
@@ -845,7 +860,7 @@ class Middleman():
                     # if we do via points, instead of IDLE task, send next position in via points list
                     self.setRobotToIdle(robot)
 
-                    if guard_searching:
+                    if guard_searching or guard_clustering:
                         self.sc.mark_guard_searched(self.guardDictionary.get(robotName))
 
                 elif self.robot_stuck_count.get(robotName) is not None:
@@ -960,7 +975,7 @@ class Middleman():
         if   (self.search_algorithm == 0): # Guard searching
             self.guard_searching()
         elif (self.search_algorithm == 1): # Guard clustering
-            pass
+            self.guard_searching()
         elif (self.search_algorithm == 2): # Force dispersion
             self.classical_searching("force_dispersion")
         elif (self.search_algorithm == 3): # Random walk
@@ -1018,13 +1033,9 @@ class Middleman():
 
         if len(self.activeRobotDictionary) > 0:
 
-            # for g in sc.guard_list:
-            #     print("X " + str(g.x) + " Y " + str(g.y) + " Items " + str(g.items_to_search_for))
             wh = self.sc.get_width_and_height()
-
             robots = self.activeRobotDictionary.keys()
 
-            # for robot in self.activeRobotDictionary.values():
             for robotName in robots:
                 robot = self.activeRobotDictionary.get(robotName)
 
@@ -1046,7 +1057,7 @@ class Middleman():
                     pt_to_search = self.transform_realworld_to_map((x, y), wh)
                     # rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
 
-                    a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0], pt_to_search[1]))
+                    a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0], pt_to_search[1]), robot=robotName)
 
                     if a_guard is None:
                         print("MM: got no node, setting robot %s to idle" % (str(robotName)))
@@ -1132,7 +1143,7 @@ Parameters for coordinated search
  2 = force dispersion
  3 = random walk
 '''
-search_mode = 3
+search_mode = 0
 
 middleman = Middleman(search_mode)
 

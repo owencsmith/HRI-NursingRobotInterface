@@ -227,11 +227,12 @@ class SearchCoordinator:
                 self.cluster_dict[robot] = []
 
             # find the closest robot to each guard
+            robots = robot_dict.keys()
             for guard in self.guard_list:
-                min_dist = guard.get_distance(robot_dict[0][x], robot_dict[0][y])
+                min_dist = guard.get_distance(robot_dict[robots[0]][0], robot_dict[robots[0]][1])
                 closest_bot = robot_dict.keys()[0]
-                for robot in robot_dict.keys():
-                    dist = guard.get_distance(robot_dict[robot][x], robot_dict[robot][y])
+                for robot in robots:
+                    dist = guard.get_distance(robot_dict[robot][0], robot_dict[robot][1])
                     if dist < min_dist:
                         min_dist = dist
                         closest_bot = robot
