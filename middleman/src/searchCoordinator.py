@@ -153,7 +153,9 @@ Search Coordinator Class
 '''
 
 class SearchCoordinator:
-    def __init__(self, map_image, map_scale=0.3):
+    def __init__(self, map_image, map_scale=0.3, cluster=False):
+
+        self.cluster = cluster
         self.map_scale = map_scale
         self.original_map = load_map(map_image, map_scale)
         self.padded_map = np.flipud(pad_map(self.original_map))
@@ -172,6 +174,9 @@ class SearchCoordinator:
 
         # Dictionary to hold item locations
         self.item_location_dict = {}
+
+        # Dictionary to hold list of guards for each robot
+        self.cluster_dict = {}
 
     def get_width_and_height(self):
         # return self.width, self.height
@@ -193,7 +198,12 @@ class SearchCoordinator:
 
         return i
 
-    def start_search(self, item_ids_list):
+    def start_search(self, item_ids_list, robot_dict=None):
+
+        if (self.cluster) and (robot_dict is None):
+            raise RuntimeError("Tried starting a search without giving a robot dictionary in cluster mode")
+
+        # Add items to the search
         for item_id in item_ids_list:
             if item_id not in self.search_list:
                 self.search_list.append(item_id)
@@ -208,25 +218,57 @@ class SearchCoordinator:
             else:
                 print("SC: item \"%s\" already being searched for, not adding again" %(item_id))
 
+        # If in clustering mode, distribute all guards to a robot ahead of time
+        if self.cluster:
+
+            # Init cluster dict
+            self.cluster_dict = {}
+            for robot in robot_dict:
+                self.cluster_dict[robot] = []
+
+            # find the closest robot to each guard
+            for guard in self.guard_list:
+                min_dist = guard.get_distance(robot_dict[0][x], robot_dict[0][y])
+                closest_bot = robot_dict.keys()[0]
+                for robot in robot_dict.keys():
+                    dist = guard.get_distance(robot_dict[robot][x], robot_dict[robot][y])
+                    if dist < min_dist:
+                        min_dist = dist
+                        closest_bot = robot
+                self.cluster_dict[closest_bot].append(guard)
+            
+            print("SC: cluster dict %s" %(str(self.cluster_dict)))
+
+
     #return the guard object to search
-    def get_guard_to_search(self, robot_pos):
+    def get_guard_to_search(self, robot_pos, robot=None):
         """
         Returns the nearest guard object that still needs to be searched
         :param robot_pos: an iterable containing [robot_x, robot_y]
         :return: The guard object, its [x,y] position
         """
-        closest_guard = None
-        shortest_dist = float('inf')
-        for g in self.guard_list:
-            d = g.get_distance(robot_pos[0], robot_pos[1])
-            # print("guard: " + str(g) + " need searching? " + str(g.needs_searching()))
-            if (d < shortest_dist) and (g.needs_searching()):
-                shortest_dist = d
-                closest_guard = g
 
-        if(closest_guard is not None):
-            closest_guard.being_searched = True
-            return closest_guard, [closest_guard.x, closest_guard.y] #resize_to_orig(self.map_scale, closest_guard.position)
+        if (self.cluster) and (robot is None):
+            raise RuntimeError("Tried getting a guard without giving a robot in cluster mode")
+
+        if not self.cluster:
+            closest_guard = None
+            shortest_dist = float('inf')
+            for g in self.guard_list:
+                d = g.get_distance(robot_pos[0], robot_pos[1])
+                # print("guard: " + str(g) + " need searching? " + str(g.needs_searching()))
+                if (d < shortest_dist) and (g.needs_searching()):
+                    shortest_dist = d
+                    closest_guard = g
+
+            if(closest_guard is not None):
+                closest_guard.being_searched = True
+                return closest_guard, [closest_guard.x, closest_guard.y] #resize_to_orig(self.map_scale, closest_guard.position)
+
+        else: # cluster mode
+            if len(self.cluster_dict[robot]) > 0:
+                closest_guard = self.cluster_dict[robot].pop()
+                return closest_guard, [closest_guard.x, closest_guard.y]
 
         print("SC: no nodes to search for, returning None")
         return None, None

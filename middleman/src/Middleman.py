@@ -40,7 +40,9 @@ import numpy as np
 
 class Middleman():
 
-    def __init__(self):
+    def __init__(self, search_algorithm):
+
+        self.search_algorithm = search_algorithm
 
         rospy.init_node("middleman", anonymous=True)
         print("Initializing Middleman Node")
@@ -818,12 +820,9 @@ class Middleman():
 
             pass
 
-    def checkSearchStatus(self, search_algorithm):
+    def checkSearchStatus(self):
 
-        if search_algorithm == "guard_searching":
-            guard_searching = True
-        else:
-            guard_searching = False
+        guard_searching = (self.search_algorithm==0)
 
         posTolerance = .3
         moveTolerance = 0.000005
@@ -880,7 +879,6 @@ class Middleman():
 
             pass
 
-
     def get_force_vector(self, thisRobotName):
         robots = self.activeRobotDictionary.keys()
         thisRobot = self.activeRobotDictionary.get(thisRobotName)
@@ -935,7 +933,6 @@ class Middleman():
 
         return new_pose
 
-
     def point_to_index(self, loc):
 
         res = self.map.info.resolution
@@ -946,7 +943,6 @@ class Middleman():
         Ycell = int((loc[1] - Yorigin - (res / 2)) / res)
 
         return Ycell*self.map.info.width + Xcell
-
 
     def get_random_point(self, thisRobotName):
         thisRobot = self.activeRobotDictionary.get(thisRobotName)
@@ -959,6 +955,19 @@ class Middleman():
             return self.get_random_point(self, thisRobotName)
         else:
             return new_pose
+
+    def do_searching(self):
+        if   (self.search_algorithm == 0): # Guard searching
+            self.guard_searching()
+        elif (self.search_algorithm == 1): # Guard clustering
+            pass
+        elif (self.search_algorithm == 2): # Force dispersion
+            self.classical_searching("force_dispersion")
+        elif (self.search_algorithm == 3): # Random walk
+            middleman.classical_searching("random_walk")
+        else:
+            pass
+
 
     def classical_searching(self, name):
 
@@ -1004,7 +1013,6 @@ class Middleman():
                         robot.currentTask = taskMsg
                         robot.currentTaskName = taskMsg.taskName
                         self.sendRobotToPos(robot,  new_position[0][0], new_position[1][0], yaw)
-
 
     def guard_searching(self):
 
@@ -1117,11 +1125,16 @@ class Middleman():
         self.map = msg
 
 
-middleman = Middleman()
-first_time = True
-guard_searching = False
-force_dispersion = True
-random_walk = False
+'''
+Parameters for coordinated search
+ 0 = guard searching
+ 1 = guard clustering
+ 2 = force dispersion
+ 3 = random walk
+'''
+search_mode = 3
+
+middleman = Middleman(search_mode)
 
 while not rospy.is_shutdown():
     middleman.assignIdleRobots()
@@ -1129,13 +1142,6 @@ while not rospy.is_shutdown():
     middleman.publishRobotsLeftInQueue()
     middleman.publishTaskList()
     middleman.dynamicReassignmentCheck()
-    if guard_searching:
-        middleman.checkSearchStatus("guard_searching")
-        middleman.guard_searching()
-    elif force_dispersion:
-        middleman.checkSearchStatus("force_dispersion")
-        middleman.classical_searching("force_dispersion")
-    elif random_walk:
-        middleman.checkSearchStatus("random_walk")
-        middleman.classical_searching("random_walk")
+    middleman.checkSearchStatus()
+    middleman.do_searching()
     middleman.rate.sleep()
