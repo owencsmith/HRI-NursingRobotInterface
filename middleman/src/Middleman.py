@@ -1055,6 +1055,7 @@ class Middleman():
                         if name == "force_dispersion":
                             print("MM: new force for " + robotName)
                             new_position = self.get_force_vector(robotName)
+                            print("MM: Total Travelled Distance: " + str(self.total_path_distance))
 
                         elif name == "random_walk":
                             print("MM: new random point for " + robotName)
