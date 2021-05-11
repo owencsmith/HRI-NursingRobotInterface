@@ -143,6 +143,10 @@ class Middleman():
 
         print("Initialization Done \n")
 
+        # self.robot_same_force_count = {}
+        # self.robot_previous_forces = {}
+        # self.robot_stop_counting_distance = {}
+
     # check data length >= 4
     # process task determines which queue to put the task in
     def processTask(self, data):
@@ -866,10 +870,16 @@ class Middleman():
                 robYaw = robotEuler[2]
 
                 # If the guard was reached
-                if ((abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance) and
-                        (abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance)):
+                if abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance and abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance:
                     # if we do via points, instead of IDLE task, send next position in via points list
+
+                    # print(str(robot.pose.pose.pose.position.x - robot.currentTask.X))
+                    # print(str(robot.pose.pose.pose.position.y - robot.currentTask.Y))
+                    # print(str((robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance))
+                    # print(str((robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance))
                     self.setRobotToIdle(robot)
+
+                    print("MM: setting "+robotName+ " back to idle")
 
                     if guard_searching or guard_clustering:
                         self.sc.mark_guard_searched(self.guardDictionary.get(robotName))
@@ -945,18 +955,20 @@ class Middleman():
         if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
             # rospy.logwarn("force in obstacle or unknown")
             reduced_force = force/10
-            for i in range(10):
+            for i in range(10,1,-1):
                 incremental_force = reduced_force*i
                 new_pose = np.array([[thisRobot.pose.pose.pose.position.x + incremental_force[0][0]],
                                      [thisRobot.pose.pose.pose.position.y + incremental_force[1][0]]])
                 # map_coords = int(new_pose[1][0] * self.map.info.width + new_pose[0][0])
                 map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
                 if self.map.data[map_coords] == 0:
+                    # print("force is: " + str(incremental_force))
                     return new_pose
             # rospy.logwarn("could not find incremental force point that wasnt in obstacle")
         # else:
         #     rospy.logwarn("force sending to open cell")
 
+        # print("force is: "+str(force))
         return new_pose
 
 
@@ -1043,6 +1055,7 @@ class Middleman():
                         if name == "force_dispersion":
                             print("MM: new force for " + robotName)
                             new_position = self.get_force_vector(robotName)
+
                         elif name == "random_walk":
                             print("MM: new random point for " + robotName)
                             new_position = self.get_random_point(robotName)
