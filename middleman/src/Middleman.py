@@ -375,9 +375,9 @@ class Middleman():
 
         if self.total_path_distance.get(currentRobot.name) is not None:
             current_distance = self.total_path_distance.get(currentRobot.name)
-            self.total_path_distance[currentRobot.name] = current_distance + math.sqrt(X**2 + Y**2)
+            self.total_path_distance[currentRobot.name] = current_distance + math.sqrt((currentRobot.pose.pose.pose.position.x - X)**2 + (currentRobot.pose.pose.pose.position.y - Y)**2)
         else:
-            self.total_path_distance[currentRobot.name] = math.sqrt(X**2 + Y**2)
+            self.total_path_distance[currentRobot.name] = math.sqrt((currentRobot.pose.pose.pose.position.x - X)**2 + (currentRobot.pose.pose.pose.position.y - Y)**2)
 
         # print('Publishing Nav Goal')
 
@@ -1013,12 +1013,12 @@ class Middleman():
     def classical_searching(self, name):
 
         sup = list(self.activeSupervisorDictionary.keys())
-        found_tolerance = 3 #set to realsense depth
+        found_tolerance = 0.3
         if len(self.activeSupervisorDictionary.values()) != 0:
 
             if not self.searchStarted:
                 self.start_time = rospy.Time.now().secs
-                self.items_list = ["scissors", "advil", "bandages"]
+                self.items_list = ["scissors", "advil", "bandages","scalpel","gauze","stethoscope","gurney","disinfectant","cast","thermometer"]
                 self.sc.start_search(self.items_list)
                 self.searchStarted = True
                 print("STARTED SEARCH")
@@ -1033,6 +1033,7 @@ class Middleman():
 
             if len(self.items_list) == 0:
                 rospy.logwarn("SEARCH DONE")
+                print("Total Travelled Distance: " + str(self.total_path_distance))
 
             elif rospy.Time.now().secs - self.start_time > MAX_SIM_TIME_SECONDS:
                 rospy.logwarn("SEARCH DONE --- TIMEOUT")
@@ -1045,7 +1046,7 @@ class Middleman():
                     for item_name in self.items_list:
                         item = self.item_list_world_coords.get(item_name)
                         if abs(item[0]-robot.pose.pose.pose.position.x) < found_tolerance and abs(item[1]-robot.pose.pose.pose.position.y) < found_tolerance:
-                            print("MML " + item_name.upper() + " FOUND")
+                            print("MM: " + item_name.upper() + " FOUND")
                             print("Time found: " + str(rospy.Time.now().secs - self.start_time) + " seconds")
 
                             self.items_list.remove(item_name)
@@ -1188,8 +1189,8 @@ Parameters for coordinated search
  2 = force dispersion
  3 = random walk
 '''
-search_mode = 2
-MAX_SIM_TIME_SECONDS = 600
+search_mode = 3
+MAX_SIM_TIME_SECONDS = 200
 middleman = Middleman(search_mode)
 
 while not rospy.is_shutdown():
