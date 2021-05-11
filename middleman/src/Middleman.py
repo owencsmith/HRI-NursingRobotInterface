@@ -994,6 +994,7 @@ class Middleman():
         if len(self.activeSupervisorDictionary.values()) != 0:
 
             if not self.searchStarted:
+                self.start_time = rospy.Time.now().secs
                 self.items_list = ["scissors", "advil", "bandages"]
                 self.sc.start_search(self.items_list)
                 self.searchStarted = True
@@ -1018,6 +1019,8 @@ class Middleman():
                         item = self.item_list_world_coords.get(item_name)
                         if abs(item[0]-robot.pose.pose.pose.position.x) < found_tolerance and abs(item[1]-robot.pose.pose.pose.position.y) < found_tolerance:
                             print("MML " + item_name.upper() + " FOUND")
+                            print("Time found: " + str(rospy.Time.now().secs - self.start_time) + " seconds")
+
                             self.items_list.remove(item_name)
 
                     if (robot.currentTaskName == "IDLE") and (len(self.activeSupervisorDictionary.values()) != 0):
