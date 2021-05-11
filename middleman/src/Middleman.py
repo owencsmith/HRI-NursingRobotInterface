@@ -139,6 +139,8 @@ class Middleman():
         self.robot_previous_poses = {}
         self.robot_resend_amt = {}
 
+        self.total_path_distance = {}
+
         print("Initialization Done \n")
 
     # check data length >= 4
@@ -227,6 +229,8 @@ class Middleman():
     def searchTask(self, taskMsg):
         # print("Processing Search Goal")
         # parses Robot name XY string and sends to robots movebase
+
+        self.start_time = rospy.Time.now().secs
 
         splitvar = taskMsg.variables.split(",")
 
@@ -364,6 +368,13 @@ class Middleman():
         self.goal_publisher = rospy.Publisher(topic, PoseStamped, queue_size=10)
         rospy.sleep(2)
         self.goal_publisher.publish(poseStamped)
+
+        if self.total_path_distance.get(currentRobot.name) is not None:
+            current_distance = self.total_path_distance.get(currentRobot.name)
+            self.total_path_distance[currentRobot.name] = current_distance + math.sqrt(X**2 + Y**2)
+        else:
+            self.total_path_distance[currentRobot.name] = math.sqrt(X**2 + Y**2)
+
         # print('Publishing Nav Goal')
 
     def passRobotToQueueForOperator(self, robotName):
@@ -932,7 +943,7 @@ class Middleman():
         # map_coords = int(((new_pose[1][0] + self.map.info.origin.position.y)*(1/res))*self.map.info.width + (new_pose[0][0] + self.map.info.origin.position.x)*(1/res))
 
         if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
-            rospy.logwarn("force in obstacle or unknown")
+            # rospy.logwarn("force in obstacle or unknown")
             reduced_force = force/10
             for i in range(10):
                 incremental_force = reduced_force*i
@@ -942,9 +953,9 @@ class Middleman():
                 map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
                 if self.map.data[map_coords] == 0:
                     return new_pose
-            rospy.logwarn("could not find incremental force point that wasnt in obstacle")
-        else:
-            rospy.logwarn("force sending to open cell")
+            # rospy.logwarn("could not find incremental force point that wasnt in obstacle")
+        # else:
+        #     rospy.logwarn("force sending to open cell")
 
         return new_pose
 
@@ -1009,7 +1020,11 @@ class Middleman():
                     print(item_name + " position is " + str(item))
 
             if len(self.items_list) == 0:
-                rospy.loginfo("SEARCH DONE")
+                rospy.logwarn("SEARCH DONE")
+
+            elif rospy.Time.now().secs - self.start_time > MAX_SIM_TIME_SECONDS:
+                rospy.logwarn("SEARCH DONE --- TIMEOUT")
+                print("Total Travelled Distance: " + str(self.total_path_distance))
 
             else:
                 robots = self.activeRobotDictionary.keys()
@@ -1047,6 +1062,10 @@ class Middleman():
 
             wh = self.sc.get_width_and_height()
             robots = self.activeRobotDictionary.keys()
+
+            if rospy.Time.now().secs - self.start_time > MAX_SIM_TIME_SECONDS:
+                rospy.logwarn("SEARCH DONE --- TIMEOUT")
+                print("Total Travelled Distance: " + str(self.total_path_distance))
 
             for robotName in robots:
                 robot = self.activeRobotDictionary.get(robotName)
@@ -1155,8 +1174,8 @@ Parameters for coordinated search
  2 = force dispersion
  3 = random walk
 '''
-search_mode = 3
-
+search_mode = 2
+MAX_SIM_TIME_SECONDS = 600
 middleman = Middleman(search_mode)
 
 while not rospy.is_shutdown():
