@@ -86,7 +86,7 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
         for pt in line:
             x = pt[0]
             y = pt[1]
-            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+            ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='g', facecolor='g'))
 
     # Optional draw TD vertices
     for vert in vertices:
@@ -103,14 +103,14 @@ def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), 
             ax.add_patch(Rectangle((y - 0.5, x - 0.5), 1, 1, edgecolor='r', facecolor='r'))
 
     #GRAPH ROBOTS POSITIONS (ex ros output "robot trina2_3 trap graph position is 89, 44" plug in (89 - 0.5, 44 - 0.5) into Rectangle
-    ax.add_patch(Rectangle((89 - 0.5, 37 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
-    ax.add_patch(Rectangle((89 - 0.5, 94 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
-    ax.add_patch(Rectangle((89 - 0.5, 88 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
-
-    #GRAPH THEIR GUARDS (ex ros output is "guard: [88, 91]" plug in (88 - 0.5, 91 - 0.5) into Rectangle
-    ax.add_patch(Rectangle((87 - 0.5, 44 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
-    ax.add_patch(Rectangle((99 - 0.5, 105 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
-    ax.add_patch(Rectangle((90 - 0.5, 85 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+    # ax.add_patch(Rectangle((89 - 0.5, 37 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+    # ax.add_patch(Rectangle((89 - 0.5, 94 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+    # ax.add_patch(Rectangle((89 - 0.5, 88 - 0.5), 1, 1, edgecolor='b', facecolor='b'))
+    #
+    # #GRAPH THEIR GUARDS (ex ros output is "guard: [88, 91]" plug in (88 - 0.5, 91 - 0.5) into Rectangle
+    # ax.add_patch(Rectangle((87 - 0.5, 44 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+    # ax.add_patch(Rectangle((99 - 0.5, 105 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
+    # ax.add_patch(Rectangle((90 - 0.5, 85 - 0.5), 1, 1, edgecolor='y', facecolor='y'))
 
 
     # Optional draw visibility map
@@ -163,7 +163,8 @@ class SearchCoordinator:
         self.width, self.height = np.shape(self.padded_map)
 
         self.td = TrapezoidalDecomposition(self.padded_map)
-        
+
+        # self.vertices, self.lines = self.td.create_trapezoids()
         self.centers = self.td.find_centers()
 
         # Create list of guard objects
@@ -184,6 +185,11 @@ class SearchCoordinator:
 
     def draw_guards(self):
         draw_path(np.flipud(self.original_map), "Trapezoidal Decomposition Centers", centers=self.centers)
+
+        # To see the lines and vertices from trapezoidal decomposition, uncommment the below lines
+        # AND the line initialzing self.lines and self.vertices in the init function
+        # draw_path(np.flipud(self.original_map), "Trapezoidal Decomposition Centers", lines=self.lines)
+        # draw_path(np.flipud(self.original_map), "Trapezoidal Decomposition Centers", vertices=self.vertices)
 
     def draw_guards_gone_to(self, guard):
         guards = list()

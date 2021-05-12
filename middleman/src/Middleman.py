@@ -1078,9 +1078,9 @@ class Middleman():
             wh = self.sc.get_width_and_height()
             robots = self.activeRobotDictionary.keys()
 
-            if rospy.Time.now().secs - self.start_time > MAX_SIM_TIME_SECONDS:
-                rospy.logwarn("SEARCH DONE --- TIMEOUT")
-                print("Total Travelled Distance: " + str(self.total_path_distance))
+            # if rospy.Time.now().secs - self.start_time > MAX_SIM_TIME_SECONDS:
+            #     rospy.logwarn("SEARCH DONE --- TIMEOUT")
+            print("Total Travelled Distance: " + str(self.total_path_distance))
 
             for robotName in robots:
                 robot = self.activeRobotDictionary.get(robotName)
@@ -1189,7 +1189,7 @@ Parameters for coordinated search
  2 = force dispersion
  3 = random walk
 '''
-search_mode = 3
+search_mode = 0
 MAX_SIM_TIME_SECONDS = 200
 middleman = Middleman(search_mode)
 

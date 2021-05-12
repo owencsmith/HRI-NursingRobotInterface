@@ -52,7 +52,7 @@ class TrapezoidalDecomposition:
 
         self.vertices = vertices
         self.line_list_for_boundaries = line_list_for_boundaries
-        # return vertices, line_list_for_boundaries
+        return vertices, line_list_for_boundaries
 
     def find_centers(self):
 
