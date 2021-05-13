@@ -192,7 +192,7 @@ class SearchCoordinator:
         return len(self.padded_map), len(self.padded_map[0])
 
     def draw_guards(self):
-        draw_path(np.flipud(self.original_map), "Trapezoidal Decomposition Centers")
+        draw_path(np.flipud(self.original_map), "Trapezoidal Decomposition Centers", centers=self.centers)
 
         # To see the lines and vertices from trapezoidal decomposition, uncommment the below lines
         # AND the line initialzing self.lines and self.vertices in the init function
