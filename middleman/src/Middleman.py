@@ -850,6 +850,10 @@ class Middleman():
             pass
 
     def checkSearchStatus(self):
+        '''
+        checks status of robots with searching tasks.  If a robot has reached the given position, then it sets it back to idle
+        it also keeps track of robots previous poses, to check if it is stick.  If it is, it puts it back to idle.
+        '''
 
         guard_searching = (self.search_algorithm==0)
         guard_clustering = (self.search_algorithm==1)
@@ -859,11 +863,10 @@ class Middleman():
 
         robots = self.activeRobotDictionary.keys()
 
-        # for robot in self.activeRobotDictionary.values():
         for robotName in robots:
 
             robot = self.activeRobotDictionary.get(robotName)
-            if (robot.currentTask.taskName == "SEARCH"):
+            if robot.currentTask.taskName == "SEARCH":
                 quat = robot.pose.pose.pose.orientation
                 quat_list = [quat.x, quat.y, quat.z, quat.w]
                 robotEuler = euler_from_quaternion(quat_list)
@@ -871,16 +874,12 @@ class Middleman():
 
                 # If the guard was reached
                 if abs(robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance and abs(robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance:
-                    # if we do via points, instead of IDLE task, send next position in via points list
 
-                    # print(str(robot.pose.pose.pose.position.x - robot.currentTask.X))
-                    # print(str(robot.pose.pose.pose.position.y - robot.currentTask.Y))
-                    # print(str((robot.pose.pose.pose.position.x - robot.currentTask.X) <= posTolerance))
-                    # print(str((robot.pose.pose.pose.position.y - robot.currentTask.Y) <= posTolerance))
                     self.setRobotToIdle(robot)
 
                     print("MM: setting "+robotName+ " back to idle")
 
+                    # marks the assigned guard to a robot as searched since the robot reached the guard location
                     if guard_searching or guard_clustering:
                         self.sc.mark_guard_searched(self.guardDictionary.get(robotName))
 
@@ -888,19 +887,23 @@ class Middleman():
                     if self.robot_stuck_count.get(robotName) > 100:
                         self.setRobotToIdle(robot)
 
-                        # TODO: change this to sc.reassign_guard() so that it isn't marked searched
-                        #       was only done this way to prevent impossible to reach guards from crashing the system
-
                         print("MM: Robot %s is stuck, giving up on node" %(str(robotName)))
+
+                        # if a robot is stuck, it reassigns its guard to another robot,
+                        # to make sure all the guards are searched
                         if guard_searching:
                             self.sc.reassign_guard(self.guardDictionary.get(robotName))
 
 
                 if self.robot_previous_poses.get(robotName) is not None:
+
                     prev_pose = self.robot_previous_poses.get(robotName)
                     if ((abs(robot.pose.pose.pose.position.x - prev_pose[0]) <= moveTolerance) and
                             (abs(robot.pose.pose.pose.position.y - prev_pose[1]) <= moveTolerance) and
                             (abs(robYaw - prev_pose[2]) <= moveTolerance)):
+
+                        #increment the stuck count, so if it goes over the max iteration allowed for being at the same
+                        #location, then it can be put back to idle and its unreached guard can get reassigned
                         if self.robot_stuck_count.get(robotName) is not None:
                             count = self.robot_stuck_count.get(robotName)
                             self.robot_stuck_count[robotName] = count+1
@@ -908,27 +911,26 @@ class Middleman():
                         if self.robot_stuck_count.get(robotName) is not None:
                             self.robot_stuck_count[robotName] = 0
 
-
-                # rospy.logwarn(robotName + " position is " + str(robot.pose.pose.pose.position.x) + ", " + str(robot.pose.pose.pose.position.y) + ", " + str(robYaw))
-
                 self.robot_previous_poses[robotName] = (robot.pose.pose.pose.position.x, robot.pose.pose.pose.position.y, robYaw)
 
             pass
 
     def get_force_vector(self, thisRobotName):
+        '''
+        calculates the force vector for force dispersion. Loosely based on coulombs law for same charged particles
+        '''
+
         robots = self.activeRobotDictionary.keys()
         thisRobot = self.activeRobotDictionary.get(thisRobotName)
         force = np.array([[0.0],[0.0]])
         for robotName in robots:
             robot = self.activeRobotDictionary.get(robotName)
             if robotName != thisRobotName:
-                quat = robot.pose.pose.pose.orientation
-                quat_list = [quat.x, quat.y, quat.z, quat.w]
-                robotEuler = euler_from_quaternion(quat_list)
-                robYaw = robotEuler[2]
 
                 dx = thisRobot.pose.pose.pose.position.x - robot.pose.pose.pose.position.x
                 dy = thisRobot.pose.pose.pose.position.y - robot.pose.pose.pose.position.y
+
+                # angle of incidence between robot and another robot
                 robots_theta = math.atan2(dy, dx)
                 radius = math.sqrt(dx**2+dy**2)
 
@@ -937,42 +939,29 @@ class Middleman():
         scale = 10
         force = force*scale
         new_pose = np.array([[thisRobot.pose.pose.pose.position.x + force[0][0]],[thisRobot.pose.pose.pose.position.y+force[1][0]]])
-        # print(new_pose)
-
-        # res = self.map.info.resolution
-        # hi_x = abs(self.map.info.origin.position.x)
-        # hi_y = abs(self.map.info.origin.position.y)
-        #
-        # x = (np.interp(new_pose[0][0], [-hi_x, hi_x], [0, (hi_x * 2)])) / res
-        # y = (np.interp(new_pose[1][0], [-hi_y, hi_y], [0, (hi_y * 2)])) / res
-        # map_coords = int(y *self.map.info.width +x)
-        # map_coords = int(new_pose[1][0] * self.map.info.width + new_pose[0][0])
         map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
-        # print(map_coords)
 
-        # map_coords = int(((new_pose[1][0] + self.map.info.origin.position.y)*(1/res))*self.map.info.width + (new_pose[0][0] + self.map.info.origin.position.x)*(1/res))
+        # if the point the robot is being sent to is unknown or occupied, then use incremental force vector to find closest point
+        # to send the robot to that is still in the same direction as the original force, but with different magnitude
 
         if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
-            # rospy.logwarn("force in obstacle or unknown")
             reduced_force = force/10
             for i in range(10,1,-1):
                 incremental_force = reduced_force*i
                 new_pose = np.array([[thisRobot.pose.pose.pose.position.x + incremental_force[0][0]],
                                      [thisRobot.pose.pose.pose.position.y + incremental_force[1][0]]])
-                # map_coords = int(new_pose[1][0] * self.map.info.width + new_pose[0][0])
                 map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
                 if self.map.data[map_coords] == 0:
-                    # print("force is: " + str(incremental_force))
                     return new_pose
-            # rospy.logwarn("could not find incremental force point that wasnt in obstacle")
-        # else:
-        #     rospy.logwarn("force sending to open cell")
 
-        # print("force is: "+str(force))
         return new_pose
 
 
     def point_to_index(self, loc):
+        '''
+        :param loc: location in real world map frame (gazebo/rviz)
+        :return: the corresponding index in the occupancy grid for that point
+        '''
 
         res = self.map.info.resolution
         Xorigin = self.map.info.origin.position.x
@@ -985,19 +974,25 @@ class Middleman():
 
 
     def get_random_point(self, thisRobotName):
-        thisRobot = self.activeRobotDictionary.get(thisRobotName)
+        '''
+        :return: a random point in the map that isnt occupied or unknown
+        '''
 
+        thisRobot = self.activeRobotDictionary.get(thisRobotName)
         new_pose = np.array([[thisRobot.pose.pose.pose.position.x+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))],[thisRobot.pose.pose.pose.position.y+(np.random.uniform(0,3)*(1.0 if np.random.random() < 0.5 else -1.0))]])
 
         map_coords = self.point_to_index((new_pose[0][0], new_pose[1][0]))
         if self.map.data[map_coords] == -1 or self.map.data[map_coords] == 100:
-            # print("finding another random point - previous was unknown or occupied")
             return self.get_random_point(thisRobotName)
         else:
             return new_pose
 
 
     def do_searching(self):
+        '''
+        starts the corresponding search based on search_algorithm
+        '''
+
         if   (self.search_algorithm == 0): # Guard searching
             self.guard_searching()
         elif (self.search_algorithm == 1): # Guard clustering
@@ -1011,11 +1006,17 @@ class Middleman():
 
 
     def classical_searching(self, name):
+        '''
+        searches that are used for gathering results
+        contains force dispersion and random walk.  The only difference in the algorithms is the way the next pose of a
+        robot is calculated
+        '''
 
         sup = list(self.activeSupervisorDictionary.keys())
         found_tolerance = 0.3
         if len(self.activeSupervisorDictionary.values()) != 0:
 
+            #start it here because its not started from the ui
             if not self.searchStarted:
                 self.start_time = rospy.Time.now().secs
                 self.items_list = ["scissors", "advil", "bandages","scalpel","gauze","stethoscope","gurney","disinfectant","cast","thermometer"]
@@ -1031,6 +1032,7 @@ class Middleman():
                     self.item_list_world_coords[item_name] = item
                     print(item_name + " position is " + str(item))
 
+            # printouts for data gathering purposes
             if len(self.items_list) == 0:
                 rospy.logwarn("SEARCH DONE")
                 print("Total Travelled Distance: " + str(self.total_path_distance))
@@ -1078,13 +1080,15 @@ class Middleman():
             wh = self.sc.get_width_and_height()
             robots = self.activeRobotDictionary.keys()
 
+            # Uncomment for metric testing to gather results for 4 algorithms
             # if rospy.Time.now().secs - self.start_time > MAX_SIM_TIME_SECONDS:
             #     rospy.logwarn("SEARCH DONE --- TIMEOUT")
-            print("Total Travelled Distance: " + str(self.total_path_distance))
+            # print("Total Travelled Distance: " + str(self.total_path_distance))
 
             for robotName in robots:
                 robot = self.activeRobotDictionary.get(robotName)
 
+                # if a robot is idle, and there are guards availible to be searched, set it to search a guard
                 if (robot.currentTaskName == "IDLE") and (len(self.activeSupervisorDictionary.values()) != 0) and (
                         self.sc.get_num_nodes_to_search() > 0):
                     x = robot.pose.pose.pose.position.x
@@ -1094,43 +1098,37 @@ class Middleman():
                     robotEuler = euler_from_quaternion(quat_list)
                     yaw = robotEuler[2]
 
-                    #if x != 0 and y != 0:
                     sup = list(self.activeSupervisorDictionary.keys())
 
                     print("MM: Robot %s is no longer idle, sending to guard" % (str(robotName)))
-
-                    # rospy.logwarn("robot " + str(robotName) + " position is: " + str(x) + ", " + str(y))
                     pt_to_search = self.transform_realworld_to_map((x, y), wh)
-                    # rospy.logwarn("robot " + str(robotName) + " trap graph position is " + str(pt_to_search[0]) + ", " + str(pt_to_search[1]))
-
                     a_guard, guard_position = self.sc.get_guard_to_search((pt_to_search[0], pt_to_search[1]), robot=robotName)
 
+                    # if a guard isn't available
                     if a_guard is None:
                         print("MM: got no node, setting robot %s to idle" % (str(robotName)))
                         self.setRobotToIdle(robot)
 
+                    # records the guard a robot is sent to, and sends the robot to the guard, and sets its task as searching
                     else:
-                        # rospy.logwarn("guard: " + str(guard_position))
                         self.guardDictionary[robotName] = a_guard
                         map_pt = self.transform_map_to_realworld((guard_position[0], guard_position[1]), wh)
-                        # self.sendRobotToPos(robot, map_pt[0], map_pt[1])
                         taskMsg = Task("SEARCH", 0, robotName, map_pt[0], map_pt[1], yaw, False,
                                         sup[0]).convertTaskToTaskMsg()
                         robot.currentTask = taskMsg
                         robot.currentTaskName = taskMsg.taskName
                         self.sendRobotToPos(robot, map_pt[0], map_pt[1], yaw)
 
-                    # else:
-                    #     rospy.loginfo("Robot " + robotName + " is " + robot.currentTaskName + " and " + str(len(self.activeSupervisorDictionary.values())) + " supervisor")
-                    #     rospy.loginfo("Robot " + robotName + " task location: " + str(robot.currentTask.X) + ", " + str(robot.currentTask.Y))
-
-                # Lets hope it never has a guard at 0,0
                 if (robot.currentTaskName == "SEARCH") and (robot.currentTask.X == 0) and (robot.currentTask.Y == 0):
                     self.setRobotToIdle(robot)
-                #if (robot.currentTaskName == "IDLE") and (robot.currentTask.X == 0) and (robot.currentTask.Y == 0):
-                #    self.setRobotToIdle(robot)
+
 
     def transform_realworld_to_map(self, pt, trap_graph_wh):
+        '''
+        :param pt: point to transform
+        :param trap_graph_wh: width and height of map that trapezoidal decomposition was done on
+        :return: transformed point from realworld/gazebo/rviz frame to the map frame for trapezoidal decomposition
+        '''
 
         transformed_pt = []
         res = self.map.info.resolution
@@ -1140,22 +1138,24 @@ class Middleman():
         trap_graph_height = float(trap_graph_wh[1])
         map_width = float(self.map.info.width)
         map_height = float(self.map.info.height)
-        # print(map_width)
-        # print(trap_graph_width)
+
         translated_x = (pt[0] - origin_x) / res
         translated_y = -(pt[1] - origin_y) / res + map_height
-        # rospy.logwarn("intermediate point is " + str([translated_x, translated_y]))
+
         scaled_x = translated_x * (trap_graph_width / map_width)
         scaled_y = translated_y * (trap_graph_height / map_height)
-        # rospy.logwarn("scaled point is " + str([scaled_x, scaled_y]))
-        # GUARD IS ROW, COL
+
         transformed_pt.append(int(scaled_x))
         transformed_pt.append(int(scaled_y))
-        # rospy.logwarn("transformed point world to guard is: " + str(transformed_pt))
-        # transformed_pt = (0, 0)
+
         return transformed_pt
 
     def transform_map_to_realworld(self, pt, trap_graph_wh):
+        '''
+        :param pt: point to transform
+        :param trap_graph_wh: width and height of map that trapezoidal decomposition was done on
+        :return: transformed point in realworld/gazebo/rviz frame
+        '''
         transformed_pt = []
         res = self.map.info.resolution
         origin_x = self.map.info.origin.position.x
@@ -1167,15 +1167,10 @@ class Middleman():
 
         scaled_x = pt[0] * (map_width / trap_graph_width)
         scaled_y = pt[1] * (map_height / trap_graph_height)
-        # scaled_y = pt[1]-map_height*(map_height/trap_graph_height)
 
-        # transformed_pt.append(scaled_x*res + origin_x)
-        # transformed_pt.append(-(scaled_y*res + origin_y))
         transformed_pt.append(scaled_x * res + origin_x)
         transformed_pt.append(-(scaled_y - map_height) * res + origin_y)
 
-        # rospy.logwarn("transformed point guard to world is: " + str(transformed_pt))
-        # transformed_pt = (0,0)
         return transformed_pt
 
     def map_callback(self, msg):

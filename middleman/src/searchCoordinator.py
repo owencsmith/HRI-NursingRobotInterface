@@ -43,6 +43,11 @@ def load_map(file_path, resolution_scale):
 
 
 def resize_to_orig(resolution_scale, pt):
+    '''
+    :param resolution_scale: the scale that was used to make a grid from the map
+    :param pt: a point in the current scaled frame
+    :return: a point in the original frame
+    '''
     old_res = 1/resolution_scale
 
     cx = int(pt[0]*old_res)
@@ -51,9 +56,10 @@ def resize_to_orig(resolution_scale, pt):
     return (cx,cy)
 
 
-# Adds 1 pixel of padding around all obstacles so that all vertices are created at
-#   a free point on the original map
 def pad_map(map):
+    '''
+    Adds 1 pixel of padding around all obstacles so that all vertices are created at a free point on the original map
+    '''
 
     # make a copy to store the padded data in
     padded_map = copy.deepcopy(map)
@@ -73,6 +79,10 @@ def pad_map(map):
     return padded_map
 
 def draw_path(grid, title, lines = list(), vertices = list(), centers = list(), visibility_map=None):
+
+    '''
+    this draws locations of vertices, centers, lines, on the grid map
+    '''
     
     # Create plot
     fig, ax = plt.subplots(1)
@@ -180,7 +190,6 @@ class SearchCoordinator:
         self.cluster_dict = {}
 
     def get_width_and_height(self):
-        # return self.width, self.height
         return len(self.padded_map), len(self.padded_map[0])
 
     def draw_guards(self):
@@ -191,12 +200,10 @@ class SearchCoordinator:
         # draw_path(np.flipud(self.original_map), "Trapezoidal Decomposition Centers", lines=self.lines)
         # draw_path(np.flipud(self.original_map), "Trapezoidal Decomposition Centers", vertices=self.vertices)
 
-    def draw_guards_gone_to(self, guard):
-        guards = list()
-        guards.append([guard.y, guard.x])
-        draw_path(self.original_map, "Guard", vertices=guards)
-
     def get_num_nodes_to_search(self):
+        '''
+        :return: the number of guards left that need searching
+        '''
         i = 0
         for g in self.guard_list:
             if g.needs_searching():
@@ -205,6 +212,9 @@ class SearchCoordinator:
         return i
 
     def start_search(self, item_ids_list, robot_dict=None):
+        '''
+        initializes the guards and the algorithms, and sets locations for the inputted items
+        '''
 
         if (self.cluster) and (robot_dict is None):
             raise RuntimeError("Tried starting a search without giving a robot dictionary in cluster mode")
@@ -282,11 +292,13 @@ class SearchCoordinator:
 
 
     def get_closest_guard(self, robot_pos):
+        '''
+        :return: the closest guard to a given point that needs searching
+        '''
         closest_guard = None
         shortest_dist = float('inf')
         for g in self.guard_list:
             d = g.get_distance(robot_pos[0], robot_pos[1])
-            # print("guard: " + str(g) + " need searching? " + str(g.needs_searching()))
             if (d < shortest_dist) and (g.needs_searching()):
                 shortest_dist = d
                 closest_guard = g
@@ -295,6 +307,10 @@ class SearchCoordinator:
 
 
     def mark_guard_searched(self, guard, items_found=[]):
+        '''
+        marks the given guard as searched, and if an item was found a that guard location, remove it from the current
+        list of items being searched at each guard, since it was already found
+        '''
 
         items = []
         items = items + items_found

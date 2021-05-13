@@ -9,8 +9,8 @@ class TrapezoidalDecomposition:
 
     def __init__(self, map_array):
         self.map_array = map_array  # map array, 1->free, 0->obstacle
-        self.size_row = map_array.shape[0]  # map size
-        self.size_col = map_array.shape[1]
+        self.size_row = map_array.shape[0]  # map row size
+        self.size_col = map_array.shape[1]  # map col size
 
     def create_trapezoids(self):
 
@@ -25,10 +25,13 @@ class TrapezoidalDecomposition:
                     if self.is_vertex((r, c), 0, self.size_row, self.size_col):
                         count2 += 1
                         vertices.append((r, c))
-        # return vertices
 
+        # this for loop finds the lines that will act as the upper and lower boundaries for trapezoids, with the
+        # left and right edges being walls/obstacles
         for vertice in vertices:
-            # get left and right lines from vertices
+
+            # get left and right lines from vertices by extending left in the map and right from the map from a
+            # vertice until another obstacle is hit
             row = vertice[0]
             col = vertice[1]
             left_line = list()
@@ -42,6 +45,7 @@ class TrapezoidalDecomposition:
                         line_list_for_boundaries.append(left_line)
                         break
 
+            #right
             if col != self.size_col - 1:
                 for c in range(col + 1, self.size_col):
                     if self.map_array[row, c] == 1:
@@ -56,7 +60,11 @@ class TrapezoidalDecomposition:
 
     def find_centers(self):
 
-        # Find the vertuces and edges of the trapezoids
+        '''
+        finds the centers of the trapezoids, whos 4 corners are vertices
+        '''
+
+        # Find the vertices and edges of the trapezoids
         self.create_trapezoids()
 
         # Draw the trapezoid boundaries in the map
@@ -85,6 +93,9 @@ class TrapezoidalDecomposition:
 
     def iterative_bfs(self, grid, queue, visited, min_dimension, max_dimension_row,
                       max_dimension_col):
+        '''
+        Taken from first homework, this is used to explore nodes in the map to find the interior of a trapezoid
+        '''
 
         this_bfs_visited = list()
 
@@ -127,6 +138,10 @@ class TrapezoidalDecomposition:
             return (mid_pt_row, mid_pt_col), visited
 
     def is_vertex(self, node, min_dimension, max_dimension_row, max_dimension_col):
+
+        '''
+        :return: if a given node is a vertex
+        '''
 
         row = node[0]
         col = node[1]
@@ -486,9 +501,11 @@ class TrapezoidalDecomposition:
                 obstacle_counter += 1
                 right_obstacle_counter += 1
 
+        # makes sure walls are not counted as a vertex
         if abs(right_free_counter - left_free_counter) > 1:
-            # if right_free_counter!=left_free_counter:
             ratio = float(free_counter) / float((free_counter + obstacle_counter))
+            # checks if the ratio of free nodes surrounding a node in 8 connected style is 50% or more of the total
+            # nodes surrounding the node
             if ratio >= 0.5:
                 return True
             else:
@@ -498,6 +515,11 @@ class TrapezoidalDecomposition:
 
     def four_connected(self, node, visited, min_dimension, max_dimension_row, max_dimension_col, queue, grid,
                        parent_dict):
+
+        '''
+        determines parent nodes and queues up neighbor nodes that are connected up, down, left, and right to the node
+        being given to the function
+        '''
 
         row = node[0]
         col = node[1]
@@ -509,32 +531,21 @@ class TrapezoidalDecomposition:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
 
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
             node_to_add = [min_dimension + 1, min_dimension]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
 
         elif node[0] == max_dimension_row and node[1] == max_dimension_col:
             node_to_add = [max_dimension_row, max_dimension_col - 1]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [max_dimension_row - 1, max_dimension_col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
 
         elif node[0] == min_dimension and node[1] == max_dimension_col:
 
@@ -542,16 +553,11 @@ class TrapezoidalDecomposition:
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [min_dimension, max_dimension_col - 1]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
 
         elif node[0] == max_dimension_row and node[1] == min_dimension:
 
@@ -559,16 +565,11 @@ class TrapezoidalDecomposition:
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [max_dimension_row - 1, min_dimension]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
 
         elif node[0] == min_dimension:
 
@@ -576,23 +577,16 @@ class TrapezoidalDecomposition:
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row + 1, col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row, col - 1]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
 
         elif node[1] == min_dimension:
 
@@ -600,23 +594,16 @@ class TrapezoidalDecomposition:
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row + 1, col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row - 1, col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
 
         elif node[0] == max_dimension_row:
 
@@ -624,46 +611,32 @@ class TrapezoidalDecomposition:
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row, col - 1]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row - 1, col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
 
         elif node[1] == max_dimension_col:
             node_to_add = [row + 1, col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row, col - 1]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row - 1, col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
-
 
         else:
 
@@ -671,28 +644,20 @@ class TrapezoidalDecomposition:
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row + 1, col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row, col - 1]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
             node_to_add = [row - 1, col]
             if node_to_add not in queue and grid[node_to_add[0]][node_to_add[1]] == 1 and node_to_add not in visited:
                 parent_dict[str(node_to_add)] = node
                 queue.append(node_to_add)
-            # elif node_to_add in queue:
-            #     parent_dict[str(node_to_add)] = node
 
         return queue, parent_dict
